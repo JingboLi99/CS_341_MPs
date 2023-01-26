@@ -397,11 +397,26 @@ gcc -g
 
 
 5. Are tabs or spaces used to indent the commands after the rule in a Makefile?
-6. What does `git commit` do? What's a `sha` in the context of git?
-7. What does `git log` show you?
-8. What does `git status` tell you and how would the contents of `.gitignore` change its output?
-9. What does `git push` do? Why is it not just sufficient to commit with `git commit -m 'fixed all bugs' `?
-10. What does a non-fast-forward error `git push` reject mean? What is the most common way of dealing with this?
+
+tabs
+7. What does `git commit` do? What's a `sha` in the context of git?
+
+git commit saves the work commited so far and added with git add on the local repo. SHA is a hashing algorithm used for the commit to make changes to the local repository to result the changes.
+
+9. What does `git log` show you?
+
+It shows a list of commits made in a repo.
+
+11. What does `git status` tell you and how would the contents of `.gitignore` change its output?
+
+It tells you which files have been staged with git add, ready to be committed, which files are untracked. The untracked files are under the .gitignore folder.
+
+13. What does `git push` do? Why is it not just sufficient to commit with `git commit -m 'fixed all bugs' `?
+
+Git push uploads the current version of the file from your local repository to a remote repository. The comments are too general and not very helpful to others working on the same repo.
+
+15. What does a non-fast-forward error `git push` reject mean? What is the most common way of dealing with this?
+You need to fetch and merge the remote branch again as there are issues with overlapping commits.
 
 ## Optional (Just for fun)
 - Convert your a song lyrics into System Programming and C code and share on Ed.
