@@ -381,9 +381,22 @@ You may not have enough space allocated for it since gets() does not tell you if
 
 ### Introducing `sscanf` and friends
 3. Write code that parses the string "Hello 5 World" and initializes 3 variables to "Hello", 5, and "World".
+
+char* s = "Hello 5 World";
+	
+char buffer1[25];
+int val = 0;
+char buffer2[25];
+
+sscanf(s, "%s %d %s", buffer1, &val, buffer2);
+
 ### `getline` is useful
 4. What does one need to define before including `getline()`?
-5. Write a C program to print out the content of a file line-by-line using `getline()`.
+
+#define _GNU_SOURCE
+
+6. Write a C program to print out the content of a file line-by-line using `getline()`.
+
 
 ## C Development
 
