@@ -86,7 +86,7 @@ float *four(const int *x) {
 void five(const char *a) {
     char first_char = a[0];
     if ((first_char >= 'A' && first_char <= 'Z') || (first_char >= 'a' && first_char <= 'z'))
-        printf("a is a letter\n");
+        printf("a is a letter.\n");
     else
         printf("a is not a letter.\n");
 }
