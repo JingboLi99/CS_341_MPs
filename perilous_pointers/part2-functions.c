@@ -48,6 +48,7 @@ void strange_step(char *value) {
 void empty_step(void *value) {
     if (!value) {
         printf("empty_step failed\n");
+    
     } else if (((char *)value)[3] == 0) {
         printf("5: Illinois\n");
     } else {
