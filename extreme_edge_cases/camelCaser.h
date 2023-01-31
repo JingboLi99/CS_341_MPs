@@ -18,7 +18,6 @@
  *         input. Each C-string contains exactly one camelCased sentence.
  */
 char **camel_caser(const char *input_str);
-char *make_camel(const char *in_sentence);
 /**
  * Destroys the camelCased output returned by the camel_caser() function.
  *
