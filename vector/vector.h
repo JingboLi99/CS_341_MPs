@@ -238,7 +238,7 @@ void vector_push_back(vector *this, void *element);
 /**
  * Removes the last element in the vector, effectively reducing the container
  * size by one.
- *
+ * 
  * This destroys the removed element.
  *
  * http://www.cplusplus.com/reference/vector/vector/pop_back/
