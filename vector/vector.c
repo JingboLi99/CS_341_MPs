@@ -237,14 +237,14 @@ void **vector_front(vector *this) {
     assert(this);
     // your code here
     assert(!vector_empty(this));
-    return this->array[0];
+    return &this->array[0];
 }
 
 void **vector_back(vector *this) {
     // your code here
     assert(this);
     assert(!vector_empty(this));
-    return this->array[this->size - 1];
+    return &this->array[this->size - 1];
 }
 
 void vector_push_back(vector *this, void *element) {
@@ -270,7 +270,7 @@ void vector_pop_back(vector *this) {
     // your code here
     assert(!vector_empty(this));
     //destroy last valid element:
-    this->destructor(vector_back(this));
+    this->destructor(*vector_back(this));
     this->array[this->size-1] = NULL;
     this->size --;
 

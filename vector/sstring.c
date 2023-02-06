@@ -18,6 +18,18 @@ struct sstring {
     size_t size; // size does not include ending char
 };
 
+// ADDITIONAL HELPER FUNCTIONS:
+
+char* getSubString(char *in, int s, int len){
+    int i = 0;
+    char *dest = malloc(len+1);
+    dest[len] = '\0';
+    for (;i < len; i++){
+        dest[i] = in[i+s];
+    }
+    return dest;
+}
+
 sstring *cstr_to_sstring(const char *input) {
     // your code goes here
     
@@ -250,22 +262,3 @@ void sstring_destroy(sstring *this) {
 }
 
 
-// ADDITIONAL HELPER FUNCTIONS:
-int getSize(sstring * in){
-    return in->size;
-}
-
-
-char* getSubString(char *in, int s, int len){
-    int i = 0;
-    char *dest = malloc(len+1);
-    dest[len] = '\0';
-    for (;i < len; i++){
-        dest[i] = in[i+s];
-    }
-    return dest;
-}
-
-vector *getVec(sstring *in){
-    return in->svec;
-}

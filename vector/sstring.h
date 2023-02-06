@@ -114,10 +114,10 @@ char *sstring_slice(sstring *this, int start, int end);
  */
 void sstring_destroy(sstring *this);
 
-//ADDITIONAL HELPER FUNCTIONS:
-//get size:
-int getSize(sstring * in);
-//return slice of in string, inclusive start index, len is length of substring
-char* getSubString(char *in, int s, int len);
-//return the vector array for this string:
-vector *getVec(sstring *in);
+// //ADDITIONAL HELPER FUNCTIONS:
+// //get size:
+// int getSize(sstring * in);
+// //return slice of in string, inclusive start index, len is length of substring
+// char* getSubString(char *in, int s, int len);
+// //return the vector array for this string:
+// vector *getVec(sstring *in);
