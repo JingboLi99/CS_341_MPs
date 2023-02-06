@@ -117,11 +117,11 @@ vector *vector_create(copy_constructor_type copy_constructor,
 void vector_destroy(vector *this) {
     assert(this);
     // your code here
-
+    
     // needs to destroy all elements, user created or default
     if (this->array){
         size_t i = 0;
-        for (;i < this->capacity; i++){
+        for (;i < this->size; i++){
             if (this->array[i]){
                 this->destructor(this->array[i]);
             }
@@ -237,7 +237,7 @@ void **vector_front(vector *this) {
     assert(this);
     // your code here
     assert(!vector_empty(this));
-    return vector_begin(this);
+    return this->array[0];
 }
 
 void **vector_back(vector *this) {
@@ -259,7 +259,7 @@ void vector_push_back(vector *this, void *element) {
     else{
         vector_reserve(this, this->size+1);
         // this->destructor(this->array[this->size+1]);
-        this->array[this->size+1] = this->copy_constructor(element);
+        this->array[this->size] = this->copy_constructor(element);
         this->size ++;
         //increase in capacity is already handled by reserve
     }
@@ -338,6 +338,7 @@ void vector_clear(vector *this) {
                 this->size --;
             }
         }
+        this->size = 0;
     }
 }
 

@@ -71,10 +71,6 @@ int sstring_append(sstring *this, sstring *addition);
  */
 vector *sstring_split(sstring *this, char delimiter);
 
-//get size:
-int getSize(sstring * in);
-//return slice of in string, inclusive start index, len is length of substring
-char* getSubString(char *in, int s, int len);
 /**
  * This function should substitute one occurrence of target in this after offset
  * bytes with
@@ -117,3 +113,11 @@ char *sstring_slice(sstring *this, int start, int end);
  * shall be a valid sstring allocated on the heap.
  */
 void sstring_destroy(sstring *this);
+
+//ADDITIONAL HELPER FUNCTIONS:
+//get size:
+int getSize(sstring * in);
+//return slice of in string, inclusive start index, len is length of substring
+char* getSubString(char *in, int s, int len);
+//return the vector array for this string:
+vector *getVec(sstring *in);

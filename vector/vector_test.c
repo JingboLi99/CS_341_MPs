@@ -28,32 +28,29 @@ int main() {
     // vector_destroy(vector);
     
 
-    //3. Test Pushback, pop back, 
-    vector *vec3 = vector_create(string_copy_constructor, string_destructor, string_default_constructor);
+    //3. Test Pushback, pop back,
+    vector *vec3 = vector_create(int_copy_constructor, int_destructor, int_default_constructor);
     vector_reserve(vec3, 200);
     printf("Vec size after resize: %zu, %zu\n", vector_size(vec3), vector_capacity(vec3));
     int a = 0;
-    for (; a < 20;){
+    for (; a < 3;a++){
         vector_push_back(vec3, &a);
-        a+=2;
     }
     printf("Vec size after push back: %zu, %zu\n", vector_size(vec3), vector_capacity(vec3));
     
-    int i = 0;
-    for (;i < 7; i++){
-        printf("Item %d is: %d\n",i, *((int *) vector_get(vec3, i)));
-    }
-    // int new_first = 500000;
-    // vector_set(vec3, 0, &new_first);
-    // vector_pop_back(vec3);
-    // i = 0;
-    // for (;i < 10; i++){
-    //     printf("Item %d is: %d\n",i, *((int *) vector_get(vec3, i)));
-    // }
-    // printf("Vec size after set and popback: %zu\n", vector_size(vec3));
-
-
+    int * front =(int *) vector_front(vec3);
+    int * back =(int *) vector_back(vec3);
+    int *front2 = (int *) vector_get(vec3, 0);
+    printf("front and back: %d, %d, %d\n", *front, *front2, *back);
+    
+    // test clear:
+    // vector_clear(vec3);
+    // printf("Size after clear: %zu\n", vector_size(vec3));
+    //test vector erase for last element:
+    vector_erase(vec3, vector_size(vec3) - 1);
+    vector_erase(vec3, vector_size(vec3) - 1);
+    vector_erase(vec3, vector_size(vec3) - 1);
+    printf("Size after erase: %zu\n", vector_size(vec3));
     vector_destroy(vec3); //WARNING: Losing 2 bytes here
-
     //4. Test insert, erase
 }    
