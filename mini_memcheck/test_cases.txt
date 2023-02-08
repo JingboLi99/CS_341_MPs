@@ -1,0 +1,9 @@
+All tests for this Lab:
+
+bad_free_test: Test with a program that frees or reallocs invalid addresses
+calloc_test: Test calloc with a program that has no memory leaks
+full_test: Test with a program that has a variety of issues
+leak_test: Test with a program that has memory leaks
+no_leak_test: Test with a program that has no memory leaks
+realloc_test: Test realloc with a program that has no memory leaks
+
