@@ -32,7 +32,7 @@ void print_exec_failed();
  * This function gets called whenever your env fails to
  * change an environment variable.
  * To be more specific, you should only call this function when
- * setenv() or getenv() fails (when do they fail?).
+ * setnev() or getenv() fails (when do they fail?).
  * Note: You are still responsible for
  * freeing all resources BEFORE calling this function.
  */
