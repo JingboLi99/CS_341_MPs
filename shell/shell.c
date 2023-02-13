@@ -96,7 +96,7 @@ FILE* file_handler(char * filename, int type){
         }
     }
     else{
-        if (!(fp = fopen(filename, "a"))){
+        if (!(fp = fopen(filename, "r"))){
             print_script_file_error();
             return NULL;
         }
@@ -221,9 +221,10 @@ int path_change_handler(vector * cur_cmd){
     return 0;
 }
 
-int command_handler(char * command, vector * cmd_segments){
+int command_handler(char * command){
     //Check if command is a change path command (from !<prefix> or #<n> command executions that skip the original path change handler)
     char * first_two_chars = getSubString(command, 0, 2);
+    vector * cmd_segments = str_to_vector(command); //Need to free
     if (strcmp(first_two_chars, "cd") == 0){
         if (vector_size(cmd_segments) != 2){ //check that the format is cd <path> and has 2 words
             print_invalid_command(command);
@@ -243,6 +244,7 @@ int command_handler(char * command, vector * cmd_segments){
             int status;
             waitpid(child_id, &status, 0);
             if (WEXITSTATUS(status)) {
+                vector_destroy(cmd_segments);
                 return 1;
             }
             print_command_executed(child_id); //external command successfully executed
@@ -256,8 +258,10 @@ int command_handler(char * command, vector * cmd_segments){
         }
         else{
             print_fork_failed();
+            vector_destroy(cmd_segments);
             return 1; 
         }
+        vector_destroy(cmd_segments);
         return 0;
     }
 }
@@ -304,7 +308,7 @@ int shell(int argc, char *argv[]) {
     }
     
     // Run a loop constantly checking for std/ file input
-    while(1){
+    while(1){        
         // handle SIGINT
         signal(SIGINT, sig_handler);
         // Prompt user with current pid and path
@@ -312,45 +316,51 @@ int shell(int argc, char *argv[]) {
         size_t path_size = MAX_PATH * sizeof(char);
         path = malloc(path_size);
         getcwd(path, 256);
-        print_prompt(path, pid);
+        if (!hasScript) print_prompt(path, pid); // do not print if file input
         //get current input:
         size_t in_size = MAX_IN * sizeof(char);
         input = malloc(in_size); //Need to free
 
-        if (getline(&input, &in_size, stdin) >= 0){
-            char * std_temp = getSubString(input, 0, strlen(input)-1); //strip off the '\n'
-            free(input);
-            input = std_temp;
-            std_temp = NULL;
-        }
-        else{ // getline returns -1: EOF or stdin read error:
-            handle_eof();
-            //free all resources up to this point. close files
-            free(input);
-            free(path);
-            vector_destroy(cmd_hist);
-            if (hist_wtr) fclose(hist_wtr);
-            if (scrpt_rdr) fclose(scrpt_rdr);
-            exit(0);
-        }
         // If there is a script file, change the input to come from script file (previously was to check for EOF)
         if (hasScript){
-            if (input) free(input); //free existing std in input (if any)
             if (getline(&input, &in_size, scrpt_rdr) >= 0){ //if there are still lines to read in file:
-                char * file_temp = getSubString(input, 0, strlen(input)-1); //strip off the '\n'
-                // free(input);
-                input = file_temp;
-                file_temp = NULL;
+                if (input[strlen(input)-1] == '\n'){
+                    char * std_temp = getSubString(input, 0, strlen(input)-1); //strip off the '\n'
+                    free(input);
+                    input = std_temp;
+                    std_temp = NULL;
+                }
             }
             else{ //no more lines to read (EOF): getline returns -1
                 //TODO: Kill running background child processes
                 handle_eof();
                 //free all resources up to this point. close files
-                free(input);
-                free(path);
+                if (input) free(input);
+                if (path) free(path);
                 vector_destroy(cmd_hist);
                 if (hist_wtr) fclose(hist_wtr);
                 if (scrpt_rdr) fclose(scrpt_rdr);
+                // printf("\n"); // if we come directly from printing prompt, there will be no new line
+                exit(0);
+            }
+        }
+        //No script file, input comes from stdin
+        else{
+            if (getline(&input, &in_size, stdin) >= 0){
+                char * std_temp = getSubString(input, 0, strlen(input)-1); //strip off the '\n'
+                free(input);
+                input = std_temp;
+                std_temp = NULL;
+            }
+            else{ // getline returns -1: EOF or stdin read error:
+                handle_eof();
+                //free all resources up to this point. close files
+                if (input) free(input);
+                if (path) free(path);
+                vector_destroy(cmd_hist);
+                if (hist_wtr) fclose(hist_wtr);
+                if (scrpt_rdr) fclose(scrpt_rdr);
+                printf("\n");
                 exit(0);
             }
         }
@@ -370,6 +380,8 @@ int shell(int argc, char *argv[]) {
         vector **cmd_arr = split_by_operator(input); //Need to free each vector in this array: free at end of inner while loop
         if (! cmd_arr){ // Incorrect use of operators
             print_invalid_command(input); 
+            if (input) free(input);
+            if (path) free(path);
             continue; //get next prompt, do not go through inner loop
         }
         //**Command Execution**
@@ -393,8 +405,8 @@ int shell(int argc, char *argv[]) {
             if (strcmp(cur_cmd_str, "exit") == 0){
                 handle_eof();
                 //free all resources up to this point. close files
-                free(input);
-                free(path);
+                if (input) free(input);
+                if (path) free(path);
                 vector_destroy(cmd_hist);
                 if (hist_wtr) fclose(hist_wtr);
                 if (scrpt_rdr) fclose(scrpt_rdr);
@@ -430,7 +442,7 @@ int shell(int argc, char *argv[]) {
                 }
                 else{
                     //TODO: Execute command
-                    pref_cmd_stat = command_handler(prev_cmd, cur_cmd);
+                    pref_cmd_stat = command_handler(prev_cmd);
                     vector_push_back(cmd_hist, prev_cmd); //write prev_cmd to cmd_hist vector again
                 }
                 //Free current loop resources, not all resources
@@ -453,7 +465,7 @@ int shell(int argc, char *argv[]) {
                 else{
                     vector_push_back(cmd_hist, cmd_at_idx); //write prev_cmd to cmd_hist vector again
                     //TODO: Execute command
-                    hist_idx_cmd_stat = command_handler(cmd_at_idx, cur_cmd);
+                    hist_idx_cmd_stat = command_handler(cmd_at_idx);
                 }
                 //Free current loop resources, not all resources
                 free(cur_cmd_str);
@@ -472,7 +484,7 @@ int shell(int argc, char *argv[]) {
             //What is left over are all external commands
             else{
                 //TODO: Execute external command
-                exit_status = command_handler(cur_cmd_str, cur_cmd);
+                exit_status = command_handler(cur_cmd_str);
             }
             cmd_idx++;
         }
