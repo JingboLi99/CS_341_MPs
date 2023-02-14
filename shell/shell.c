@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -42,6 +43,7 @@ char* getSubString(char *in, int s, int len){
 char * get_str_from_vec(vector * cur_cmd){
     size_t i = 0;
     char * ret_str = malloc(MAX_IN);
+    strcpy(ret_str, "");
     size_t vec_size = vector_size(cur_cmd);
     for (; i < vec_size; i++){
         char *cur_str = (char *)vector_get(cur_cmd, i);
@@ -119,10 +121,18 @@ vector **split_by_operator(char * in){
             operator_idx = i;
             n_cmds ++;
         }
-        else if(strcmp((char *)vector_get(cmds, i), ";") == 0){
-            operator_type = 2;
-            operator_idx = i;
-            n_cmds ++;
+        else{
+            char * cur_word = (char *)vector_get(cmds, i);
+            if (cur_word[strlen(cur_word)-1] == ';'){
+                operator_type = 2;
+                vector_insert(cmds, i+1, ";"); //add a new ";" in vector
+                cmd_vec_size++; //increment cmd vector size
+                //remove ';' from the previous string:
+                cur_word[strlen(cur_word)-1] = '\0'; //change ; to \0 in order to end the string earlier
+                operator_idx = i+1;
+                i++; //add on i to skip the newly added ";" in vector
+                n_cmds ++;
+            }
         }
     }
     //catch operator chaining eg. cmd a && cmd b || cmd c 
@@ -159,7 +169,7 @@ vector **split_by_operator(char * in){
     return cmd_arr;
 }
 char * get_pref_cmd(vector * cmd_hist, char * pref_cmd){
-    char * prefix = getSubString(pref_cmd, 1, strlen(pref_cmd)-1); //Need to free
+    char * prefix = getSubString(pref_cmd, 1, strlen(pref_cmd)-1); //Stripping off starting '!'. Need to free
     int pref_len = strlen(prefix);
     int cmd_idx = vector_size(cmd_hist) - 1;
     char * cmd_pref = NULL;
@@ -215,8 +225,10 @@ int path_change_handler(vector * cur_cmd){
         char * fullpath = get_full_path(path);
         if (chdir(fullpath) != 0){
             print_no_directory(fullpath);
+            free(fullpath);
             return 1;
         }
+        free(fullpath);
     }
     return 0;
 }
@@ -247,9 +259,12 @@ int command_handler(char * command){
                 vector_destroy(cmd_segments);
                 return 1;
             }
-            print_command_executed(child_id); //external command successfully executed
+            // print_command_executed(child_id); //external command successfully executed
         }
         else if (! child_id){
+            //this is child
+            pid_t cur_id = getpid();
+            print_command_executed(cur_id); //external command successfully executed
             char ** args = vec_to_strArr(cmd_segments); //Need to free
             execvp(args[0], &args[0]);
             print_exec_failed(command);
@@ -288,7 +303,8 @@ int shell(int argc, char *argv[]) {
                 hist_file = argv[i+1];
                 hist_wtr = file_handler(hist_file, 0); //need to close
                 if (!hist_wtr){ // there was a print history file error
-                    exit(1);
+                    vector_destroy(cmd_hist);
+                    return 1;
                 }
             }
             else if(strcmp(argv[i], "-f") == 0 && (i < argc)){
@@ -296,17 +312,18 @@ int shell(int argc, char *argv[]) {
                 script_file = argv[i+1];
                 scrpt_rdr = file_handler(script_file, 1); //need to close
                 if (!scrpt_rdr){ // there was a print script file error
-                    exit(1);
+                    vector_destroy(cmd_hist);
+                    return 1;
                 }
             }
             else{
                 print_usage(); //all other situations, the command line arguments are not passed correctly
-                exit(1);
+                vector_destroy(cmd_hist);
+                return 1;
             }
             i++;
         }
     }
-    
     // Run a loop constantly checking for std/ file input
     while(1){        
         // handle SIGINT
@@ -341,7 +358,8 @@ int shell(int argc, char *argv[]) {
                 if (hist_wtr) fclose(hist_wtr);
                 if (scrpt_rdr) fclose(scrpt_rdr);
                 // printf("\n"); // if we come directly from printing prompt, there will be no new line
-                exit(0);
+                //exit(0); //testing for the recursive shell call thing
+                return 0;
             }
         }
         //No script file, input comes from stdin
@@ -361,7 +379,7 @@ int shell(int argc, char *argv[]) {
                 if (hist_wtr) fclose(hist_wtr);
                 if (scrpt_rdr) fclose(scrpt_rdr);
                 printf("\n");
-                exit(0);
+                return 1;
             }
         }
         //If there is a history file, write current input to file. Else, just write to history vector
@@ -404,13 +422,17 @@ int shell(int argc, char *argv[]) {
             //Check for exit command:
             if (strcmp(cur_cmd_str, "exit") == 0){
                 handle_eof();
-                //free all resources up to this point. close files
+                //free all resources up to this point. close files: Make sure to free vector array
+                if (cur_cmd_str) free(cur_cmd_str);
+                cur_cmd_str = NULL;
                 if (input) free(input);
+                input = NULL;
                 if (path) free(path);
+                path = NULL;
                 vector_destroy(cmd_hist);
                 if (hist_wtr) fclose(hist_wtr);
                 if (scrpt_rdr) fclose(scrpt_rdr);
-                exit(0);
+                return 1;
             }
             // Check for !history: print all history (must be stand alone command)
             if (strcmp(vector_get(cur_cmd, 0), "!history") == 0){
@@ -427,23 +449,54 @@ int shell(int argc, char *argv[]) {
                 free(cur_cmd_str);
                 break; //no more commands to execute. TODO: check all loop resources have been freed
             }
-            //check for !<prefix> (must be stand alone command)
+            //check for !<prefix> (Everything after prefix is considered the search term)
             else if (cmd_str_1[0] == '!'){
-                int pref_cmd_stat;
-                if (n_cmds > 1 || cur_cmd_segments > 1){ //check that this is a stand alone command and command only has 1 line
-                    print_invalid_command(cur_cmd_str);
-                    //Free current loop resources, not all resources
-                    free(cur_cmd_str);
-                    break; //TODO: check all loop resources have been freed
-                }
-                char * prev_cmd = get_pref_cmd(cmd_hist, cmd_str_1);
+                char * prev_cmd = get_pref_cmd(cmd_hist, cur_cmd_str); //everything behind '!' in the whole command string is a search term
                 if (strcmp(prev_cmd, "**No prefix command") == 0){ //if no prefix command match
                     print_no_history_match();
                 }
                 else{
-                    //TODO: Execute command
-                    pref_cmd_stat = command_handler(prev_cmd);
                     vector_push_back(cmd_hist, prev_cmd); //write prev_cmd to cmd_hist vector again
+                    //write prev_cmd to hist file again
+                    if (hasHist){
+                        fprintf(hist_wtr, "%s", prev_cmd);
+                        fprintf(hist_wtr, "%s", "\n");
+                    }
+                    //TODO: Print and Execute last command
+                    print_command(prev_cmd);     
+                    // command_handler(prev_cmd);               
+                    // ***HANDLE SECONDARY COMMAND LINE FROM HISTORY***
+                    int og_op_type =  operator_type;
+                    vector ** sec_cmd_arr = split_by_operator(prev_cmd); //Need to free: This array will not contain ! # exit.
+                    if (! sec_cmd_arr){ // Incorrect use of operators
+                        print_invalid_command(prev_cmd);
+                    }
+                    else{
+                        int sec_cmd_idx = 0;
+                        int sec_exit_stat = 0;
+                        int sec_n_cmds = sizeof(sec_cmd_arr)/sizeof(sec_cmd_arr[0]);
+                        while(sec_cmd_arr[sec_cmd_idx]){
+                            if (sec_cmd_idx == 1 && ((operator_type == 0 && sec_exit_stat == 1) ||
+                                                     (operator_type == 1 && sec_exit_stat == 0) ||
+                                                     operator_type == -1)){ //this last condition shouldnt happen, since cmd_idx shouldnt go to 1 if no operator
+                                                        break; //check all loop resources have been freed
+                                                    }
+                            vector * sec_cur_cmd = sec_cmd_arr[sec_cmd_idx];
+                            char * sec_cur_cmd_str = get_str_from_vec(sec_cur_cmd); // current command in string form: Need to free
+                            sec_exit_stat = command_handler(sec_cur_cmd_str);
+                            free(sec_cur_cmd_str);
+                            sec_cmd_idx++;
+                        }
+                        //free secondary vector array
+                        int sec_vec_arr_idx = 0;
+                        for (; sec_vec_arr_idx < sec_n_cmds; sec_vec_arr_idx++){
+                            if (sec_cmd_arr[sec_vec_arr_idx]) vector_destroy(sec_cmd_arr[sec_vec_arr_idx]);
+                            sec_cmd_arr[sec_vec_arr_idx] = NULL;
+                        }
+                        free(sec_cmd_arr);
+                        sec_cmd_arr = NULL;
+                    }
+                    operator_type = og_op_type; //Change back the operator type to the original. Second split_by_operator call will chnage it
                 }
                 //Free current loop resources, not all resources
                 free(cur_cmd_str);
@@ -451,7 +504,7 @@ int shell(int argc, char *argv[]) {
             }
             //check for #<n> (must be stand alone command)
             else if (cmd_str_1[0] == '#'){
-                int hist_idx_cmd_stat;
+                // int hist_idx_cmd_stat;
                 if (n_cmds > 1 || cur_cmd_segments > 1){ //check that this is a stand alone command and command only has 1 line
                     print_invalid_command(cur_cmd_str);
                     //Free current loop resources, not all resources
@@ -464,8 +517,47 @@ int shell(int argc, char *argv[]) {
                 }
                 else{
                     vector_push_back(cmd_hist, cmd_at_idx); //write prev_cmd to cmd_hist vector again
-                    //TODO: Execute command
-                    hist_idx_cmd_stat = command_handler(cmd_at_idx);
+                    //write prev_cmd to hist file again
+                    if (hasHist){
+                        fprintf(hist_wtr, "%s", cmd_at_idx);
+                        fprintf(hist_wtr, "%s", "\n");
+                    }
+                    //TODO: print and Execute command
+                    print_command(cmd_at_idx);
+                    // hist_idx_cmd_stat = command_handler(cmd_at_idx);
+
+                    // ***HANDLE SECONDARY COMMAND LINE FROM HISTORY***
+                    int og_op_type =  operator_type;
+                    vector ** sec_cmd_arr = split_by_operator(cmd_at_idx); //Need to free: This array will not contain ! # exit.
+                    if (! sec_cmd_arr){ // Incorrect use of operators
+                        print_invalid_command(cmd_at_idx);
+                    }
+                    else{
+                        int sec_cmd_idx = 0;
+                        int sec_exit_stat = 0;
+                        int sec_n_cmds = sizeof(sec_cmd_arr)/sizeof(sec_cmd_arr[0]);
+                        while(sec_cmd_arr[sec_cmd_idx]){
+                            if (sec_cmd_idx == 1 && ((operator_type == 0 && sec_exit_stat == 1) ||
+                                                     (operator_type == 1 && sec_exit_stat == 0) ||
+                                                     operator_type == -1)){ //this last condition shouldnt happen, since cmd_idx shouldnt go to 1 if no operator
+                                                        break; //check all loop resources have been freed
+                                                    }
+                            vector * sec_cur_cmd = sec_cmd_arr[sec_cmd_idx];
+                            char * sec_cur_cmd_str = get_str_from_vec(sec_cur_cmd); // current command in string form: Need to free
+                            sec_exit_stat = command_handler(sec_cur_cmd_str);
+                            free(sec_cur_cmd_str);
+                            sec_cmd_idx++;
+                        }
+                        //free secondary vector array
+                        int sec_vec_arr_idx = 0;
+                        for (; sec_vec_arr_idx < sec_n_cmds; sec_vec_arr_idx++){
+                            if (sec_cmd_arr[sec_vec_arr_idx]) vector_destroy(sec_cmd_arr[sec_vec_arr_idx]);
+                            sec_cmd_arr[sec_vec_arr_idx] = NULL;
+                        }
+                        free(sec_cmd_arr);
+                        sec_cmd_arr = NULL;
+                    }
+                    operator_type = og_op_type; //Change back the operator type to the original. Second split_by_operator call will chnage it
                 }
                 //Free current loop resources, not all resources
                 free(cur_cmd_str);
@@ -480,11 +572,13 @@ int shell(int argc, char *argv[]) {
                 else{
                     exit_status = path_change_handler(cur_cmd);
                 }
+                free(cur_cmd_str);
             }
             //What is left over are all external commands
             else{
                 //TODO: Execute external command
                 exit_status = command_handler(cur_cmd_str);
+                free(cur_cmd_str);
             }
             cmd_idx++;
         }
@@ -496,6 +590,10 @@ int shell(int argc, char *argv[]) {
         }
         free(cmd_arr);
         cmd_arr = NULL;
+        if (input) free(input);
+        if (path) free(path);
+        input = NULL;
+        path = NULL;
     }  
     return 0;
 }
