@@ -73,12 +73,12 @@ void *mini_realloc(void *payload, size_t request_size, const char *filename,
     void *head_act_data = iter + 1;
     if (head_act_data == payload){
         // a. document size change in global variables and local variables
-        int size_diff = request_size - iter->request_size;
+        int size_diff = (int) request_size - (int) iter->request_size;
         if (size_diff > 0){
             total_memory_requested += size_diff;
         }
         else{
-            total_memory_freed += size_diff;
+            total_memory_freed -= size_diff;
         }
         iter->request_size = request_size; //Modify request size
         //b. do realloc
@@ -105,12 +105,12 @@ void *mini_realloc(void *payload, size_t request_size, const char *filename,
         if (cur_act_data == payload){ //compare the 2 memory addresses: true = differnt
             //Reaching here means we found the payload node:
             // a. document size change in global variables and local variables
-            int size_diff = request_size - curr->request_size;
+            int size_diff = (int) request_size - (int) iter->request_size;
             if (size_diff > 0){
                 total_memory_requested += size_diff;
             }
             else{
-                total_memory_freed += size_diff;
+                total_memory_freed -= size_diff;
             }
             curr->request_size = request_size; //Modify request size
             //b. do realloc
