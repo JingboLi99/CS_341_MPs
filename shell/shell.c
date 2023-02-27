@@ -424,6 +424,12 @@ int ps_handler(vector* procs){
     size_t pidx = 0;
     size_t proc_vec_size = vector_size(procs); 
     print_process_info_header();
+    //evaluate shell process (parent) by adding shell process to vector, and removing it at the end
+    process * shell_process = malloc(sizeof(process));
+    shell_process->command = "./shell";
+    shell_process->pid = getpid();
+    vector_insert(procs, 0, shell_process); //REMOVE AFTER PS
+    proc_vec_size++;
     while (pidx < proc_vec_size){
         // printf("**idx: %zu\n", pidx);//REMOVE: TODO: THIS CAUSES PROBLEMS FOR SOME REASON
         process * cur_cproc = vector_get(procs, pidx); //current child process
@@ -454,7 +460,7 @@ int ps_handler(vector* procs){
                     cline = std_temp;
                     std_temp = NULL;
                 }
-                // printf("Current stat info: %s\n", cline); REMOVE
+                // printf("Current stat info: %s\n", cline); //REMOVE
                 vector * stat_vec = str_to_vector(cline); //vector of attributes from /proc/[pid]/stat file. Need to free
                 cur_act_proc->nthreads = strtol((char *)vector_get(stat_vec, 19), NULL, 10);
                 cur_act_proc->state = ((char *)vector_get(stat_vec, 2))[0];
@@ -510,6 +516,7 @@ int ps_handler(vector* procs){
         }
         fclose(cur_status_file);
     }
+    vector_erase(procs, 0);
     return 0;
 }
 //handles single external commands:
@@ -548,7 +555,6 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
     FILE *fptr = NULL; //redirection file
     bool redir_out = false; //indicates if output is written to file if true, or stdout if false.
     bool redir_in = false; //indicates if we should take command from a input file.
-    char *file_cmd_in = NULL;
     if (op_arr){ //operator exists
         command = op_arr[1]; // reset command
         free(cmd_segments); //free the current cmd segment
@@ -592,16 +598,19 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
             }
             size_t f_insize = MAX_IN;
             // read new command input file info into a string, and strip of newline character
-            if (getline(&file_cmd_in, &f_insize, fptr) >= 0){
+            char *file_cmd_in = NULL;
+            while (getline(&file_cmd_in, &f_insize, fptr) >= 0){
                 if (file_cmd_in[strlen(file_cmd_in)-1] == '\n'){
                     char * std_temp = getSubString(file_cmd_in, 0, strlen(file_cmd_in)-1); //strip off the '\n'
                     free(file_cmd_in);
                     file_cmd_in = std_temp;
                     std_temp = NULL;
                 }
+                strcat(command, " ");
+                strcat(command, file_cmd_in); //add command arguments to command string 
+                free(file_cmd_in);
+                file_cmd_in = NULL;
             }
-            strcat(command, " ");
-            strcat(command, file_cmd_in); //add command arguments to command string 
             // printf("**NEW COMMAND: %s\n", command);
             if (file_cmd_in) free(file_cmd_in); //TODO: check getline heap allocs this
             free(cmd_segments); //free the current cmd segment
