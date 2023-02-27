@@ -54,6 +54,7 @@ void *process_default_constructor(void){
 
 //GLOBAL Variables:
 static int operator_type = -1; //-1 for no operator (only 1 command), 0 = &&,  1 = ||, 2 = ;
+static char shell_cmd[32];
 //Helper functions:
 //s is start index (inclusive), len is length from start index
 char* getSubString(char *in, int s, int len){
@@ -101,7 +102,7 @@ void sig_handler(){
     //kill any foreground child, ie any child process in the current process group
     // pid_t cur_pid = getpid(); //this is the pid of parent, when sigint is called
     // pid_t cur_pgid = getpgid(cur_pid);
-    kill(0, SIGTERM); //send kill to all processes in the process group// TODO: Check if this kills the current process too
+    // kill(0, SIGTERM); //send kill to all processes in the process group// TODO: Check if this kills the current process too
     return;
 }
 //kill all active and stopped processes
@@ -426,7 +427,7 @@ int ps_handler(vector* procs){
     print_process_info_header();
     //evaluate shell process (parent) by adding shell process to vector, and removing it at the end
     process * shell_process = malloc(sizeof(process));
-    shell_process->command = "./shell";
+    shell_process->command = strdup(shell_cmd);
     shell_process->pid = getpid();
     vector_insert(procs, 0, shell_process); //REMOVE AFTER PS
     proc_vec_size++;
@@ -441,79 +442,90 @@ int ps_handler(vector* procs){
         if (cur_status_file == NULL || kill(cur_cpid, 0) == -1){ //null status file means the process has died -> remove from vector
             vector_erase(procs, pidx); //after erasing, no need to increment idx
             proc_vec_size --; 
+            if (cur_status_file) fclose(cur_status_file);
+            continue;
         }
-        else{ // There is a valid stat file for this pid
-            // printf("**CURRENTLY EVALUATING: %d\n", cur_cpid); // REMOVE
-            process_info* cur_act_proc = calloc(1, sizeof(process_info)); // initialize the proccess info struct
+        // There is a valid stat file for this pid
+        // printf("**CURRENTLY EVALUATING: %d\n", cur_cpid); // REMOVE
+        // Read the contents of the process status file
+        process_info* cur_act_proc = NULL;
+        char *cline = NULL; //need to free
+        size_t in_size = MAX_IN;
+        if (getline(&cline, &in_size, cur_status_file) >= 0){
+            if (cline[strlen(cline)-1] == '\n'){ //strip off \n if it exists
+                char * std_temp = getSubString(cline, 0, strlen(cline)-1); //strip off the '\n'
+                free(cline);
+                cline = std_temp;
+                std_temp = NULL;
+            }
+            // printf("Current stat info: %s\n", cline); //REMOVE
+            //Check for zombies:
+            vector * stat_vec = str_to_vector(cline); //vector of attributes from /proc/[pid]/stat file. Need to free
+            char cur_state = ((char *)vector_get(stat_vec, 2))[0];
+            if (cur_state == 'Z' || cur_state == 'x' || cur_state == 'X'){
+                vector_erase(procs, pidx); //after erasing, no need to increment idx
+                proc_vec_size --; 
+                if (cline) free(cline);
+                if (cur_status_file) fclose(cur_status_file);
+                continue;
+            }
+            cur_act_proc = calloc(1, sizeof(process_info)); // initialize the proccess info struct
             //read in pid and command first
             cur_act_proc->pid = cur_cproc->pid;
             char * cmdcpy = malloc(strlen(cur_cproc->command) + 1);// add one for null char
             strcpy(cmdcpy, cur_cproc->command);
             cur_act_proc->command = cmdcpy;
-            // Read the contents of the process status file
-            char *cline = NULL; //need to free
-            size_t in_size = MAX_IN;
-            if (getline(&cline, &in_size, cur_status_file) >= 0){
-                if (cline[strlen(cline)-1] == '\n'){ //strip off \n if it exists
-                    char * std_temp = getSubString(cline, 0, strlen(cline)-1); //strip off the '\n'
-                    free(cline);
-                    cline = std_temp;
-                    std_temp = NULL;
-                }
-                // printf("Current stat info: %s\n", cline); //REMOVE
-                vector * stat_vec = str_to_vector(cline); //vector of attributes from /proc/[pid]/stat file. Need to free
-                cur_act_proc->nthreads = strtol((char *)vector_get(stat_vec, 19), NULL, 10);
-                cur_act_proc->state = ((char *)vector_get(stat_vec, 2))[0];
-                cur_act_proc->vsize = strtoul((char *)vector_get(stat_vec, 22), NULL, 10);
-                //get execution time
-                unsigned long utime_clkt = strtoul((char *)vector_get(stat_vec, 13), NULL, 10);
-                unsigned long stime_clkt = strtoul((char *)vector_get(stat_vec, 14), NULL, 10);
-                unsigned long exec_time_s = (utime_clkt + stime_clkt)/sysconf(_SC_CLK_TCK); //execution time in seconds
-                cur_act_proc->time_str = malloc(32); // string of MM:SS
-                execution_time_to_string(cur_act_proc->time_str, 32, (exec_time_s/60), (exec_time_s%60));
-                // print_process_info(cur_act_proc); //REMOVE
-                //get boot time then start time
-                FILE * stat_file = NULL;
-                stat_file = fopen("/proc/stat", "r"); //open proc/stat file
-                char * cur_line = NULL; //needs to free
-                size_t bootsize = MAX_IN;
-                while (getline(&cur_line, &bootsize, stat_file) >= 0){
-                    if (strncmp(cur_line, "btime", 5) == 0){ //the current line contains btime
-                        if (cur_line[strlen(cur_line)-1] == '\n'){ //remove nextline character
-                            char * std_temp = getSubString(cur_line, 0, strlen(cur_line)-1); //strip off the '\n'
-                            if (cur_line) free(cur_line);
-                            cur_line = std_temp;
-                            std_temp = NULL;
-                        }
-                        break;
+            cur_act_proc->nthreads = strtol((char *)vector_get(stat_vec, 19), NULL, 10);
+            cur_act_proc->state = cur_state;
+            cur_act_proc->vsize = strtoul((char *)vector_get(stat_vec, 22), NULL, 10)/1024;
+            //get execution time
+            unsigned long utime_clkt = strtoul((char *)vector_get(stat_vec, 13), NULL, 10);
+            unsigned long stime_clkt = strtoul((char *)vector_get(stat_vec, 14), NULL, 10);
+            unsigned long exec_time_s = (utime_clkt + stime_clkt)/sysconf(_SC_CLK_TCK); //execution time in seconds
+            cur_act_proc->time_str = malloc(32); // string of MM:SS
+            execution_time_to_string(cur_act_proc->time_str, 32, (exec_time_s/60), (exec_time_s%60));
+            // print_process_info(cur_act_proc); //REMOVE
+            //get boot time then start time
+            FILE * stat_file = NULL;
+            stat_file = fopen("/proc/stat", "r"); //open proc/stat file
+            char * cur_line = NULL; //needs to free
+            size_t bootsize = MAX_IN;
+            while (getline(&cur_line, &bootsize, stat_file) >= 0){
+                if (strncmp(cur_line, "btime", 5) == 0){ //the current line contains btime
+                    if (cur_line[strlen(cur_line)-1] == '\n'){ //remove nextline character
+                        char * std_temp = getSubString(cur_line, 0, strlen(cur_line)-1); //strip off the '\n'
+                        if (cur_line) free(cur_line);
+                        cur_line = std_temp;
+                        std_temp = NULL;
                     }
-                    free(cur_line);
-                    cur_line = NULL;
+                    break;
                 }
-                if (stat_file) fclose(stat_file); //close proc/stat file
-                char * boot_tm_str = strdup(cur_line+6);//only copy the boot time, not the "btime " : needs to free
-                // printf("*** BOOT TIME STR: %s\n", boot_tm_str);
-                unsigned long boot_tm = strtoul(boot_tm_str, NULL, 10);
-                if (cur_line) free(cur_line);
-                free(boot_tm_str);
-                unsigned long start_clkt = strtoul((char *)vector_get(stat_vec, 21), NULL, 10); //start time in clock ticks
-                time_t starttime = (start_clkt/sysconf(_SC_CLK_TCK)) + boot_tm;
-
-                struct tm tm_info;
-                memcpy(&tm_info, localtime(&starttime), sizeof(struct tm));
-                cur_act_proc->start_str = malloc(32);
-                time_struct_to_string(cur_act_proc->start_str, 32, &tm_info);
+                free(cur_line);
+                cur_line = NULL;
             }
-            // print process header and info
-            print_process_info(cur_act_proc);
-            //free the process info struct:
-            if (cur_act_proc->time_str) free (cur_act_proc->time_str);
-            if (cur_act_proc->start_str) free (cur_act_proc->start_str);
-            if (cur_act_proc->command) free (cur_act_proc->command);
-            if (cur_act_proc) free(cur_act_proc);
-            if (cline) free(cline);
-            pidx ++;
+            if (stat_file) fclose(stat_file); //close proc/stat file
+            char * boot_tm_str = strdup(cur_line+6);//only copy the boot time, not the "btime " : needs to free
+            // printf("*** BOOT TIME STR: %s\n", boot_tm_str);
+            unsigned long boot_tm = strtoul(boot_tm_str, NULL, 10);
+            if (cur_line) free(cur_line);
+            free(boot_tm_str);
+            unsigned long start_clkt = strtoul((char *)vector_get(stat_vec, 21), NULL, 10); //start time in clock ticks
+            time_t starttime = (start_clkt/sysconf(_SC_CLK_TCK)) + boot_tm;
+
+            struct tm tm_info;
+            memcpy(&tm_info, localtime(&starttime), sizeof(struct tm));
+            cur_act_proc->start_str = malloc(32);
+            time_struct_to_string(cur_act_proc->start_str, 32, &tm_info);
         }
+        // print process header and info
+        print_process_info(cur_act_proc);
+        //free the process info struct:
+        if (cur_act_proc->time_str) free (cur_act_proc->time_str);
+        if (cur_act_proc->start_str) free (cur_act_proc->start_str);
+        if (cur_act_proc->command) free (cur_act_proc->command);
+        if (cur_act_proc) free(cur_act_proc);
+        if (cline) free(cline);
+        pidx ++;
         fclose(cur_status_file);
     }
     vector_erase(procs, 0);
@@ -552,7 +564,8 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
     }
     //Check for redirection command: returns null if there is no redirection operator
     char ** op_arr = redir_handler(cmd_segments); //Need to free each string in array
-    FILE *fptr = NULL; //redirection file
+    FILE *out_fptr = NULL; //redirection file
+    FILE *in_fptr = NULL;
     bool redir_out = false; //indicates if output is written to file if true, or stdout if false.
     bool redir_in = false; //indicates if we should take command from a input file.
     if (op_arr){ //operator exists
@@ -560,7 +573,7 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
         free(cmd_segments); //free the current cmd segment
         cmd_segments = str_to_vector(command); // redefine cmd segment
         if (strcmp(op_arr[0], "0") == 0){ // operator is: >
-            if (!(fptr = fopen(op_arr[2], "w"))){
+            if (!(out_fptr = fopen(op_arr[2], "w"))){
                 print_redirection_file_error();
                 vector_destroy(cmd_segments);
                 free(first_two_chars);
@@ -573,7 +586,7 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
             redir_out = true;
         }
         else if (strcmp(op_arr[0], "1") == 0){ // operator is : >>
-            if (!(fptr = fopen(op_arr[2], "a"))){
+            if (!(out_fptr = fopen(op_arr[2], "a"))){
                 print_redirection_file_error();
                 vector_destroy(cmd_segments);
                 free(first_two_chars);
@@ -586,7 +599,7 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
             redir_out = true;
         }
         else{ // operator is: <
-            if (!(fptr = fopen(op_arr[2], "r"))){
+            if (!(in_fptr = fopen(op_arr[2], "r"))){
                 print_redirection_file_error();
                 vector_destroy(cmd_segments);
                 free(first_two_chars);
@@ -596,25 +609,6 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
                 free(op_arr);
                 return 1;
             }
-            size_t f_insize = MAX_IN;
-            // read new command input file info into a string, and strip of newline character
-            char *file_cmd_in = NULL;
-            while (getline(&file_cmd_in, &f_insize, fptr) >= 0){
-                if (file_cmd_in[strlen(file_cmd_in)-1] == '\n'){
-                    char * std_temp = getSubString(file_cmd_in, 0, strlen(file_cmd_in)-1); //strip off the '\n'
-                    free(file_cmd_in);
-                    file_cmd_in = std_temp;
-                    std_temp = NULL;
-                }
-                strcat(command, " ");
-                strcat(command, file_cmd_in); //add command arguments to command string 
-                free(file_cmd_in);
-                file_cmd_in = NULL;
-            }
-            // printf("**NEW COMMAND: %s\n", command);
-            if (file_cmd_in) free(file_cmd_in); //TODO: check getline heap allocs this
-            free(cmd_segments); //free the current cmd segment
-            cmd_segments = str_to_vector(command); // redefine cmd segment
             redir_in = true;
         }
     }
@@ -629,7 +623,8 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
         int sig_res = sig_cmd_handler(cmd_segments, active_procs, stopped_procs);
         free(cmd_segments);
         free(first_two_chars);
-        if (fptr) fclose(fptr);
+        if (out_fptr) fclose(out_fptr);
+        if (in_fptr) fclose(in_fptr);
         return sig_res;
     }
     //For remaining external commands:
@@ -657,7 +652,8 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
         if (WEXITSTATUS(status)) {
             if (cmd_segments) vector_destroy(cmd_segments);
             if (first_two_chars) free(first_two_chars);
-            if (fptr) fclose(fptr);
+            if (out_fptr) fclose(out_fptr);
+            if (in_fptr) fclose(in_fptr);
             return 1;
         }
     }
@@ -670,9 +666,14 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
             }
         }
         if (redir_out){ //if we need to redirect output to a file:
-            int out_fd = fileno(fptr);
+            int out_fd = fileno(out_fptr);
             dup2(out_fd, STDOUT_FILENO);
-            fclose(fptr);
+            fclose(out_fptr);
+        }
+        else if(redir_in){
+            int in_fd = fileno(in_fptr);
+            dup2(in_fd, STDIN_FILENO);
+            fclose(in_fptr);
         }
         print_command_executed(child_id); //external command successfully executed
         char ** args = vec_to_strArr(cmd_segments); //Need to free
@@ -685,12 +686,14 @@ int command_handler(char * command, vector *active_procs, vector * stopped_procs
         print_fork_failed();
         vector_destroy(cmd_segments);
         free(first_two_chars);
-        fclose(fptr);
+        if (out_fptr) fclose(out_fptr);
+        if (in_fptr) fclose(in_fptr);
         return 1; 
     }
     if (cmd_segments) vector_destroy(cmd_segments);
     if (first_two_chars) free(first_two_chars);
-    if (fptr) fclose(fptr);
+    if (out_fptr) fclose(out_fptr);
+    if (in_fptr) fclose(in_fptr);
     return 0;
     
 }
@@ -712,6 +715,7 @@ int shell(int argc, char *argv[]) {
     vector *active_procs = vector_create(process_copy_constructor, process_destructor, process_default_constructor);
     vector *stopped_procs = vector_create(process_copy_constructor, process_destructor, process_default_constructor);
     //process cmd line args:
+    strcpy(shell_cmd, argv[0]);
     if (argc > 1){ //check that additional cmd line arguments are passed in:
         int i = 1;
         while (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "-f") == 0){
@@ -768,7 +772,7 @@ int shell(int argc, char *argv[]) {
             // printf("***Currently checking Process [%d], kill process returns: %d\n", cur_cpid, kill(cur_cpid, 0)); REMOVE
             // Open the status file of the current process
             char cur_stat_path[128];
-            snprintf(cur_stat_path, sizeof(cur_stat_path), "/proc/%d/status", cur_cpid); //write status path based on curr child process pid
+            snprintf(cur_stat_path, sizeof(cur_stat_path), "/proc/%d/stat", cur_cpid); //write status path based on curr child process pid
             FILE* cur_status_file = fopen(cur_stat_path, "r");
             if (cur_status_file == NULL || kill(cur_cpid, 0) == -1){ //null status file means the process has died -> remove from vector
                 printf("Process [%d] has expired\n", cur_cpid);
@@ -776,7 +780,26 @@ int shell(int argc, char *argv[]) {
                 proc_vec_size --; 
             }
             else{ //vector is still active
-                pidx ++;
+                char *cline = NULL; //need to free
+                size_t in_size = MAX_IN;
+                getline(&cline, &in_size, cur_status_file);
+                if (cline[strlen(cline)-1] == '\n'){ //strip off \n if it exists
+                    char * std_temp = getSubString(cline, 0, strlen(cline)-1); //strip off the '\n'
+                    free(cline);
+                    cline = std_temp;
+                    std_temp = NULL;
+                }
+                // printf("Current stat info: %s\n", cline);
+                vector * stat_vec = str_to_vector(cline);
+                char cur_state = ((char *)vector_get(stat_vec, 2))[0];
+                if (cur_state == 'Z' || cur_state == 'x' || cur_state == 'X'){
+                    vector_erase(active_procs, pidx); //after erasing, no need to increment idx
+                    proc_vec_size --; 
+                    if (cline) free(cline);
+                }
+                else{
+                    pidx ++;
+                }
             }
             fclose(cur_status_file);
         }
