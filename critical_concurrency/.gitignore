@@ -1,0 +1,9 @@
+*
+!rendezvous.c
+!rendezvous_sol.c
+!semamore.c
+!queue.c
+!barrier.c
+!queue_test.c
+!barrier_tests.c
+!semamore_tests.c
