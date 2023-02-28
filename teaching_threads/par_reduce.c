@@ -52,6 +52,9 @@ int par_reduce(int *list, size_t list_len, reducer reduce_func, int base_case,
                size_t num_threads) {
     /* Your implementation goes here */
     //split list into num_threads sizes of sublists:
+    if (num_threads > list_len){
+        num_threads = list_len;
+    }
     int ** sublists = get_sublists(list, num_threads, list_len); //needs to free
     size_t n_chunks = list_len / num_threads; //size of each sublist
     size_t no_adds = num_threads - (list_len % num_threads); //first no_adds sublists that will not add 1 to the size of sublist, 
