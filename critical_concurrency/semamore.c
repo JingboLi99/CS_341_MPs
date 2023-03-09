@@ -15,6 +15,10 @@
  */
 void semm_init(Semamore *s, int value, int max_val) {
     /* Your code here */
+    s->max_val = max_val;
+    s->value = value;
+    pthread_mutex_init(&s->m, NULL);
+    pthread_cond_init(&s->cv, NULL);
 }
 
 /**
@@ -22,7 +26,16 @@ void semm_init(Semamore *s, int value, int max_val) {
  *  Otherwise, should decrement the value.
  */
 void semm_wait(Semamore *s) {
+    if (!s) return;
     /* Your code here */
+    pthread_mutex_lock(&s->m);
+    while (s->value <= 0) {
+        pthread_cond_wait(&s->cv, &s->m); 
+    }
+    s->value--;
+    pthread_cond_signal(&s->cv);
+    pthread_mutex_unlock(&s->m);
+
 }
 
 /**
@@ -31,7 +44,15 @@ void semm_wait(Semamore *s) {
  *  Otherwise, should increment the value.
  */
 void semm_post(Semamore *s) {
+    if (!s) return;
     /* Your code here */
+    pthread_mutex_lock(&s->m);
+    while (s->value >= s->max_val) {
+        pthread_cond_wait(&s->cv, &s->m); 
+    }
+    s->value++;
+    pthread_cond_signal(&s->cv);
+    pthread_mutex_unlock(&s->m);
 }
 
 /**
@@ -40,5 +61,8 @@ void semm_post(Semamore *s) {
  * The actual Semamore struct must be freed by the user.
  */
 void semm_destroy(Semamore *s) {
+    if (!s) return;
     /* Your code here */
+    pthread_mutex_destroy(&s->m);
+    pthread_cond_destroy(&s->cv);
 }
