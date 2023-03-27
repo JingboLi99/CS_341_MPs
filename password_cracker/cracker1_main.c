@@ -20,7 +20,6 @@ void usage() {
 
 int main(int argc, char **argv) {
     size_t thread_count = DEFAULT_THREADS;
-
     if (argc > 1) {
         if (1 != sscanf(argv[1], "%lu", &thread_count) || thread_count < 1)
             usage();

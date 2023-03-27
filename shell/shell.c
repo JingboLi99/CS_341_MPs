@@ -69,7 +69,7 @@ char* getSubString(char *in, int s, int len){
 char * get_str_from_vec(vector * cur_cmd){
     size_t i = 0;
     char * ret_str = malloc(MAX_IN);
-    strcpy(ret_str, "");
+    strcpy(ret_str, ""); //NOTE!: CANNOT SRTCAT TO A NULL STRING!!
     size_t vec_size = vector_size(cur_cmd);
     for (; i < vec_size; i++){
         char *cur_str = (char *)vector_get(cur_cmd, i);

@@ -32,7 +32,6 @@ size_t get_new_capacity(size_t req_size) {
     size_t raw_cap = init_cap + req_size;
     int n_units = (raw_cap + 15)/16; //number of size 16 units needed for current malloc request
     return n_units * 16;
-    return raw_cap;
 }
 /**
  * Given a free block, split it into two blocks: 1. allocated block as requested 2. remaining free space as a new block
@@ -434,32 +433,32 @@ void *realloc(void *ptr, size_t size) {
         splitUsedBlock(cur_blk, size);
         return ptr;
     }
-    // // Try to coalesce current block with adjacent blocks, and see if the new free block can accomodate the request
-    // blkhead * prev_blk = getPrevBlk(cur_blk);
-    // blkhead * next_blk = getNextBlk(cur_blk);
-    // bool isEnough =  checkIsEnough(prev_blk, cur_blk, next_blk, size); //check if there is enough space after coalescing
-    // //NOTE: This takes into account the need for splitting (includes metadata size): ie either exact size, or can also accomodate additional metadata
-    // // Case 5: coalesced space is large enough
-    // if (isEnough){
-    //     /**1. copy current blocks actual data over to a new tep block
-    //      * 2. coalesce current block (basically freeing)
-    //      * 3. write back the data into the new freed block
-    //      * 4. free the temp block 
-    //      * 5. Split the block if needed (recall the blocksize is either exact or enough for splitting)
-    //     */
-    //     void * temp_data = malloc(og_size);
-    //     memcpy(temp_data, ptr, og_size);
-    //     blkhead * new_freed_blk = coalesce(prev_blk, cur_blk, next_blk);
-    //     void * new_freed_data = splitFreeBlock(new_freed_blk, size, 1);
-    //     if (size < og_size){
-    //         memcpy(new_freed_data, temp_data, size);
-    //     }
-    //     else{
-    //         memcpy(new_freed_data, temp_data, og_size);
-    //     }
-    //     free(temp_data);
-    //     return new_freed_data;
-    // }
+    // Try to coalesce current block with adjacent blocks, and see if the new free block can accomodate the request
+    blkhead * prev_blk = getPrevBlk(cur_blk);
+    blkhead * next_blk = getNextBlk(cur_blk);
+    bool isEnough =  checkIsEnough(prev_blk, cur_blk, next_blk, size); //check if there is enough space after coalescing
+    //NOTE: This takes into account the need for splitting (includes metadata size): ie either exact size, or can also accomodate additional metadata
+    // Case 5: coalesced space is large enough
+    if (isEnough){
+        /**1. copy current blocks actual data over to a new tep block
+         * 2. coalesce current block (basically freeing)
+         * 3. write back the data into the new freed block
+         * 4. free the temp block 
+         * 5. Split the block if needed (recall the blocksize is either exact or enough for splitting)
+        */
+        void * temp_data = malloc(og_size);
+        memcpy(temp_data, ptr, og_size);
+        blkhead * new_freed_blk = coalesce(prev_blk, cur_blk, next_blk);
+        void * new_freed_data = splitFreeBlock(new_freed_blk, size, 1);
+        if (size < og_size){
+            memcpy(new_freed_data, temp_data, size);
+        }
+        else{
+            memcpy(new_freed_data, temp_data, og_size);
+        }
+        free(temp_data);
+        return new_freed_data;
+    }
     // Case 6: 
     else{
         void * new_data_st = malloc(size);
