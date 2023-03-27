@@ -163,7 +163,7 @@ int start(size_t thread_count) {
             subtask->hash = cur_hash; //THIS IS SHARED!!
             subtask->count = *cur_ct; //number of iterations this thread should try
             subtask->pref = just_pref;//THIS IS SHARED!!
-            subtask->st_suf = malloc(suf_len); //Free for each subtask
+            subtask->st_suf = malloc(suf_len+1); //Free for each subtask
             subtask->stidx = *st_idx;
             subtask->local_tid = ((int) i)+1;
             strcpy(subtask->st_suf, raw_suf);
@@ -200,6 +200,8 @@ int start(size_t thread_count) {
         if (cur_user) {free(cur_user); cur_user = NULL;}
         if (cur_hash) {free(cur_hash); cur_hash = NULL;}
         if (just_pref) {free(just_pref); just_pref = NULL;}
+        if (st_idx) {free(st_idx); st_idx = NULL;}
+        if (cur_ct) {free(cur_ct); cur_ct = NULL;}
 
 
     }
