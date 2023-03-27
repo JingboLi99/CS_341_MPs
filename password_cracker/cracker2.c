@@ -111,7 +111,7 @@ void * cracker(void * args){
         v2_print_thread_result(cur_thread, i+1, 2);
         reVal = malloc(sizeof(toRet));
         reVal->foundPsw = NULL;
-        reVal->hashes = i+1;
+        reVal->hashes = i;
     }
     pthread_barrier_wait(&bar);
     return (void *) reVal;

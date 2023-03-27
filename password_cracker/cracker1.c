@@ -63,13 +63,13 @@ void * cracker(void * tid){
         int tc = cur_task->tocrack_len; //length of the suffix to generate
         size_t psw_len = strlen(cur_task->prefix) + tc;
         //initialize suffix, include ending char
-        char suf_chars[tc+1];
-        // char *suf_chars = malloc(tc+1);
-        // long total_iter = 1;
+        // char suf_chars[tc+1];
+        char *suf_chars = malloc(tc+1);
+        long total_iter = 1;
         suf_chars[tc] = '\0';
         for (int i = 0; i < tc; i++){
             suf_chars[i] = 'a';
-            // total_iter *= 26;
+            total_iter *= 26;
         }
         
         //crypt_data bookkeeping //Question: should i initialize this for each thread or as a global variable?
@@ -78,36 +78,7 @@ void * cracker(void * tid){
         //iterate through all possible suffixes
         int hashCount = 0;
         bool cracked = false;
-        while (suf_chars[tc-1] != '{'){
-            // create full psw:
-            char* psw_temp = malloc(psw_len+1); //need to free
-            strcpy(psw_temp, cur_task->prefix);
-            strcat(psw_temp, suf_chars);
-            char hashed[13+1];
-            strcpy(hashed, crypt_r( psw_temp, "xx", &cdata));
-            hashCount ++;
-            if (strcmp(hashed,  cur_task->hash) == 0){ //if this is the correct hash
-                double total_cpu_time = getCPUTime() - start_cpu_time;
-                v1_print_thread_result(cur_thread, cur_task->user, psw_temp, hashCount, total_cpu_time, 0);
-                //free heap values
-                free(psw_temp);
-                free(cur_task->hash); free(cur_task->user); free(cur_task->prefix);
-                if (cur_task) free(cur_task);
-                cracked = true;
-                (*successful_cracks) ++;
-                break;
-            }
-            //Increment suffix by one character:
-            suf_chars[0] = (char) (suf_chars[0] + 1);
-            for (int j = 0; j < tc-1; j++){
-                if (suf_chars[j] == '{'){
-                    suf_chars[j] = 'a';
-                    suf_chars[j+1]  = (char) (suf_chars[j+1] + 1);
-                }
-            }
-            if (psw_temp) free(psw_temp);//free psw_temp
-        }
-        // for (int i = 0; i < total_iter; i++){
+        // while (suf_chars[tc-1] != '{'){
         //     // create full psw:
         //     char* psw_temp = malloc(psw_len+1); //need to free
         //     strcpy(psw_temp, cur_task->prefix);
@@ -126,9 +97,39 @@ void * cracker(void * tid){
         //         (*successful_cracks) ++;
         //         break;
         //     }
-        //     incrementString(suf_chars);
+        //     //Increment suffix by one character:
+        //     suf_chars[0] = (char) (suf_chars[0] + 1);
+        //     for (int j = 0; j < tc-1; j++){
+        //         if (suf_chars[j] == '{'){
+        //             suf_chars[j] = 'a';
+        //             suf_chars[j+1]  = (char) (suf_chars[j+1] + 1);
+        //         }
+        //     }
+        //     if (psw_temp) free(psw_temp);//free psw_temp
         // }
-        // if (suf_chars) free(suf_chars);
+        for (int i = 0; i < total_iter; i++){
+            // create full psw:
+            char* psw_temp = malloc(psw_len+1); //need to free
+            strcpy(psw_temp, cur_task->prefix);
+            strcat(psw_temp, suf_chars);
+            char hashed[13+1];
+            strcpy(hashed, crypt_r( psw_temp, "xx", &cdata));
+            hashCount ++;
+            if (strcmp(hashed,  cur_task->hash) == 0){ //if this is the correct hash
+                double total_cpu_time = getCPUTime() - start_cpu_time;
+                v1_print_thread_result(cur_thread, cur_task->user, psw_temp, hashCount, total_cpu_time, 0);
+                //free heap values
+                free(psw_temp);
+                free(cur_task->hash); free(cur_task->user); free(cur_task->prefix);
+                if (cur_task) free(cur_task);
+                cracked = true;
+                (*successful_cracks) ++;
+                break;
+            }
+            incrementString(suf_chars);
+            if (psw_temp) free(psw_temp);//free psw_temp
+        }
+        free(suf_chars);
         if (!cracked){
             double total_cpu_time = getCPUTime() - start_cpu_time;
             v1_print_thread_result(cur_thread, cur_task->user, NULL, hashCount, total_cpu_time, 1);
