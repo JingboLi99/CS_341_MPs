@@ -57,11 +57,11 @@ void mmu_read_from_virtual_address(mmu *this, addr32 virtual_address,
         page_directory_entry* cur_pde = &cur_page_dir->entries[pde_base_add];
         if (!cur_pde->present){ //directory Not present: copy from disk and store in physical memory
             mmu_raise_page_fault(this); //raise page fault
-            read_page_from_disk((page_table_entry *) cur_pde);
             cur_pde->base_addr = (ask_kernel_for_frame(NULL) >> NUM_OFFSET_BITS);
+            read_page_from_disk((page_table_entry *) cur_pde);
             cur_pde->present = 1;
             cur_pde->read_write = 1;
-            cur_pde->user_supervisor = 1; //note
+            cur_pde->user_supervisor =0; //note
         }
         //pde is present
         page_table * cur_page_table = (page_table *) get_system_pointer_from_pde(cur_pde);
@@ -71,8 +71,8 @@ void mmu_read_from_virtual_address(mmu *this, addr32 virtual_address,
     //if current pte is not present
     if (!cur_pte->present){
         mmu_raise_page_fault(this); //raise page fault
-        read_page_from_disk(cur_pte);
         cur_pte->base_addr = (ask_kernel_for_frame(cur_pte) >> NUM_OFFSET_BITS);
+        read_page_from_disk(cur_pte);
         cur_pte->present = 1;
         cur_pte->read_write = 1;
         cur_pte->user_supervisor = 1; //note
@@ -124,11 +124,11 @@ void mmu_write_to_virtual_address(mmu *this, addr32 virtual_address, size_t pid,
         page_directory_entry* cur_pde = &cur_page_dir->entries[pde_base_add];
         if (!cur_pde->present){ //directory Not present: copy from disk and store in physical memory
             mmu_raise_page_fault(this); //raise page fault
-            read_page_from_disk((page_table_entry *) cur_pde);
             cur_pde->base_addr = (ask_kernel_for_frame(NULL) >> NUM_OFFSET_BITS);
+            read_page_from_disk((page_table_entry *) cur_pde);
             cur_pde->present = 1;
             cur_pde->read_write = 1;
-            cur_pde->user_supervisor = 1; //note
+            cur_pde->user_supervisor = 0; //note
         }
         //pde is present
         page_table * cur_page_table = (page_table *) get_system_pointer_from_pde(cur_pde);
@@ -138,8 +138,8 @@ void mmu_write_to_virtual_address(mmu *this, addr32 virtual_address, size_t pid,
     //if current pte is not present
     if (!cur_pte->present){
         mmu_raise_page_fault(this); //raise page fault
-        read_page_from_disk(cur_pte);
         cur_pte->base_addr = (ask_kernel_for_frame(cur_pte) >> NUM_OFFSET_BITS);
+        read_page_from_disk(cur_pte);
         cur_pte->present = 1;
         cur_pte->read_write = 1;
         cur_pte->user_supervisor = 1; //note
