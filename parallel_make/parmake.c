@@ -30,17 +30,17 @@ bool dfs(graph * dgraph, char * node, set * visited, set * stack){
         if (set_contains(visited, cur_nbr) == false){
             bool nbr_has_cycle = dfs(dgraph, cur_nbr, visited, stack);
             if (nbr_has_cycle == true){
-                free(node_nbrs); //free the vector without freeing the elements
+                vector_destroy(node_nbrs); //free the vector without freeing the elements
                 return true;
             } 
         }
         else if (set_contains(stack, cur_nbr) == true){
-            free(node_nbrs); //free the vector without freeing the elements
+            vector_destroy(node_nbrs); //free the vector without freeing the elements
             return true;
         }
     }
     set_remove(stack, node); // the set makes a deep copy, so we can remove it
-    free(node_nbrs); //free the vector without freeing the elements
+    vector_destroy(node_nbrs); //free the vector without freeing the elements
     return false;
 }
 //check if there is a cycle for this target, or any of the dependencies it has
@@ -84,7 +84,7 @@ bool runRule(graph * dgraph, char * tar){
         if (dep_success == false){
             //Mark the current rule as has failed and dont run its commands
             rule->state = 2;
-            free(dependencies);
+            vector_destroy(dependencies);
             return false;
         }
         //if current dependency succeeds, run remaining dependencies
@@ -100,7 +100,10 @@ bool runRule(graph * dgraph, char * tar){
             char * dep_tar = vector_get(dependencies, j);
             rule_t * dep_rule = (rule_t *) graph_get_vertex_value(dgraph, (void *) dep_tar);
             if (checkIsFile(dep_rule) == true){
-                vector_push_back(file_dependencies, (void *) j); //CHECK if stack int is ok
+                int * idx = malloc(sizeof(int));
+                *idx = (int) j;
+                vector_push_back(file_dependencies, (void *) idx); //CHECK if stack int is ok
+                free(idx);
             }
             else{ // there are non file dependencies -> run the rule's commands
                 has_nonfile_dep = true;
@@ -111,16 +114,20 @@ bool runRule(graph * dgraph, char * tar){
             bool dep_modded_later = false; //True if there exists >1 dependency that is modified after the current file
             struct stat cur_stat;
             if (stat(tar, &cur_stat) == -1){
-                printf("**ERROR: Unable to read current file rule's stat file\n");
+                fprintf(stdout, "**ERROR: Unable to read current file rule's stat file\n");
+                fflush(stdout);
             }
             time_t cur_mtime = cur_stat.st_mtime;
             size_t n_file_deps = vector_size(file_dependencies);
+            // fprintf(stdout, "**DEBUG: Rule <%s> reached here!\n", tar);
             for (size_t i = 0; i < n_file_deps; i++){
                 int dep_idx = *(int *)vector_get(file_dependencies, i);
+                // fprintf(stdout, "file dep idx: %d\n", dep_idx);
                 char * cur_dep_file = vector_get(dependencies, dep_idx);
                 struct stat cur_dep_stat;
                 if (stat(cur_dep_file, &cur_dep_stat) == -1){
-                    printf("**ERROR: Unable to read dependency file rule's stat file\n");
+                    fprintf(stderr, "**ERROR: Unable to read dependency file rule's stat file\n");
+                    fflush(stderr);
                 }
                 time_t dep_mtime = cur_dep_stat.st_mtime;
                 double time_diff = difftime(dep_mtime, cur_mtime);
@@ -133,7 +140,7 @@ bool runRule(graph * dgraph, char * tar){
         }
         vector_destroy(file_dependencies);
     }
-    free(dependencies); //free dependencies vector
+    vector_destroy(dependencies); //free dependencies vector
     //Check if we need to run the current rule's commands:
     if (!run_rule_cmds){ //do not need to run: mark rule as satisfied
         rule->state = 1;
@@ -179,6 +186,6 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     }
     //free graph and goals vector
     graph_destroy(dgraph);
-    free(goals);
+    vector_destroy(goals);
     return 0;
 }

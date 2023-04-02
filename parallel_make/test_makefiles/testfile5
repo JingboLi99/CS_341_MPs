@@ -1,6 +1,7 @@
 #make sure to not run file rules if the flowchart doesn't tell you to
 
 all: examples/file1
+	echo
 	echo "This (and the following lines) line should always be shown."
 	echo
 	echo "If you would like to reset this testcase, run:"
