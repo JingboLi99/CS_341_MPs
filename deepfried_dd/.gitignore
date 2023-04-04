@@ -1,0 +1,6 @@
+*
+!dd.c
+!format.c
+!format.h
+!Grader.Makefile
+!generate_data.sh
