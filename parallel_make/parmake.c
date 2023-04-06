@@ -16,7 +16,12 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <time.h>
+//**GLOBALS:
+static queue * ruleq = NULL;
+//**THREAD STARTING FUNCTION
+void * ruleExec(void * args){
 
+}
 //**HELPER FUNCTIONS
 //DFS function used by cycle checker: Return true if cycle is detected, false otherwise
 bool dfs(graph * dgraph, char * node, set * visited, set * stack){
@@ -146,6 +151,7 @@ bool runRule(graph * dgraph, char * tar){
         rule->state = 1;
         return true;
     }
+    //** REACHING HERE MEANS THE RULE HAS TO HAVE ITS COMMANDS RUN: START PARALLELIZE
     else{ // Run rule commands one by one
         size_t n_crule_cmds = vector_size(rule->commands);
         for (size_t i = 0; i < n_crule_cmds; i++){
@@ -161,12 +167,20 @@ bool runRule(graph * dgraph, char * tar){
         return true;
     }
 }
-
+//**ENTRY
 int parmake(char *makefile, size_t num_threads, char **targets) {
     // good luck
+    //THREADS POOL AND QUEUE INITIALIZATION:
+    ruleq = queue_create(-1);
+    pthread_t threads[num_threads];
+    for (size_t t = 0; t < num_threads; t++){
+        int * tid = malloc(sizeof(int));
+        *tid = ((int) t)+1;
+        pthread_create(&threads[t], NULL, ruleExec, (void *) tid);
+    }
     //TODO: NOTE!! NEED TO FREE EVERY SINGLE VECTOR RETURNED BY DGRAPH!
     graph * dgraph = parser_parse_makefile(makefile, targets); // Create dependency graph
-    vector * goals = graph_neighbors(dgraph, ""); //list of "goal" targets that we need to evaluate for //Need to free vector, but not they keys in the vectors
+    vector * goals = graph_neighbors(dgraph, ""); //list of "goal" targets that we need to evaluate for //Need to free vector
     size_t ngoals = vector_size(goals); //number of "goal" targets
     //Evaluate for each goal target: 1. Is it good? 2. If its good, sort it and run from tail upwards
     for (size_t i = 0; i < ngoals; i++){

@@ -78,35 +78,6 @@ void * cracker(void * tid){
         //iterate through all possible suffixes
         int hashCount = 0;
         bool cracked = false;
-        // while (suf_chars[tc-1] != '{'){
-        //     // create full psw:
-        //     char* psw_temp = malloc(psw_len+1); //need to free
-        //     strcpy(psw_temp, cur_task->prefix);
-        //     strcat(psw_temp, suf_chars);
-        //     char hashed[13+1];
-        //     strcpy(hashed, crypt_r( psw_temp, "xx", &cdata));
-        //     hashCount ++;
-        //     if (strcmp(hashed,  cur_task->hash) == 0){ //if this is the correct hash
-        //         double total_cpu_time = getCPUTime() - start_cpu_time;
-        //         v1_print_thread_result(cur_thread, cur_task->user, psw_temp, hashCount, total_cpu_time, 0);
-        //         //free heap values
-        //         free(psw_temp);
-        //         free(cur_task->hash); free(cur_task->user); free(cur_task->prefix);
-        //         if (cur_task) free(cur_task);
-        //         cracked = true;
-        //         (*successful_cracks) ++;
-        //         break;
-        //     }
-        //     //Increment suffix by one character:
-        //     suf_chars[0] = (char) (suf_chars[0] + 1);
-        //     for (int j = 0; j < tc-1; j++){
-        //         if (suf_chars[j] == '{'){
-        //             suf_chars[j] = 'a';
-        //             suf_chars[j+1]  = (char) (suf_chars[j+1] + 1);
-        //         }
-        //     }
-        //     if (psw_temp) free(psw_temp);//free psw_temp
-        // }
         for (int i = 0; i < total_iter; i++){
             // create full psw:
             char* psw_temp = malloc(psw_len+1); //need to free
