@@ -22,8 +22,13 @@ int main(int argc, char **argv) {
     char * mapper = argv[3];
     char * reducer = argv[4];
     int map_count = atoi(argv[5]);
-
-    int fds[map_count][2]; //initialize a file des for each pipe
+    
+    // int fds[map_count][2]; //initialize a file des for each pipe
+    int * fds[map_count];
+    for (int i = 0; i< map_count; i++) {
+        fds[i] = malloc(sizeof(int) * 2);
+        pipe(fds[i]);
+    }
     // Create one input pipe for the reducer.
     int redfd[2];
     pipe(redfd);
@@ -39,7 +44,7 @@ int main(int argc, char **argv) {
             sprintf(temp, "%d", i);
             dup2(fds[i][1], STDOUT_FILENO);
             execl("./splitter", "./splitter", infile, argv[5], temp, NULL);
-            exit(1);
+            exit(0);
         }
     }
 
@@ -53,7 +58,7 @@ int main(int argc, char **argv) {
             dup2(fds[i][0], STDIN_FILENO);
             dup2(redfd[1], STDOUT_FILENO);
             execl(mapper, mapper, NULL);
-            exit(1);
+            exit(0);
         }
     }
     close(redfd[1]);
@@ -62,7 +67,7 @@ int main(int argc, char **argv) {
         dup2(redfd[0], STDIN_FILENO);
         dup2(out_file, STDOUT_FILENO);
         execl(reducer, reducer, NULL);
-        exit(1);
+        exit(0);
     }
     close(redfd[0]);
     close(out_file);
@@ -84,5 +89,8 @@ int main(int argc, char **argv) {
     if (stat) print_nonzero_exit_status(reducer, stat);
     // Count the number of lines in the output file.
     print_num_lines(outfile);
+    for (int i = 0; i < map_count; i++) {
+        free(fds[i]);
+    }
     return 0;
 }
