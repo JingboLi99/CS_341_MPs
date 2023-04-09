@@ -43,6 +43,9 @@ void maxSemPost(){
         ms->max++;
         pthread_cond_signal(&ms->cv);
     }
+    else{
+        ms->max++;
+    }
     pthread_mutex_unlock(&ms->sm);
 }
 //**THREAD STARTING FUNCTION
@@ -259,6 +262,7 @@ void runGoal(graph * dgraph, char * goal){
                 maxSemPost();
             }
             else if(tar_stat == 1){ //current rule is still not available: check again later
+                maxSemPost();
                 continue;
             }
             else{ // current rule is available
