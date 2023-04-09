@@ -22,7 +22,6 @@ int main(int argc, char **argv) {
     char * mapper = argv[3];
     char * reducer = argv[4];
     int map_count = atoi(argv[5]);
-    
     // int fds[map_count][2]; //initialize a file des for each pipe
     int * fds[map_count];
     for (int i = 0; i< map_count; i++) {
