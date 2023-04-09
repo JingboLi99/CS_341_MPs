@@ -1,0 +1,32 @@
+# You can mark an assignment for regrading by changing false to true
+# If you mark more assignments than you are allowed for regrades
+# you will get no regrades
+# Note that if you regrade malloc you must regrade both parts
+# Note that you may not regrade networking
+
+---
+assignments:
+  charming_chatroom: false
+  critical_concurrency: false
+  deadlock_demolition: false
+  extreme_edge_cases: false
+  finding_filesystems: false
+  ideal_indirection: false
+  luscious_locks: false
+  mad_mad_access_patterns: false
+  malloc: false
+  mapreduce: false
+  mini_memcheck: false
+  parallel_make:
+    pt1: false
+    pt2: false
+  password_cracker: false
+  perilous_pointers: false
+  deepfried_dd: false
+  savvy_scheduler: false
+  shell:
+    pt1: false
+    pt2: false
+  teaching_threads: false
+  utilities_unleashed: false
+  vector: false
