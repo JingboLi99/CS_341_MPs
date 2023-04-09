@@ -2,7 +2,6 @@
  * parallel_make
  * CS 341 - Spring 2023
  */
-
 #include "format.h"
 #include "graph.h"
 #include "parmake.h"
@@ -17,8 +16,37 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <pthread.h>
+#include <time.h>
+
+//**Semaphore struct
+typedef struct maxSem{
+    pthread_mutex_t sm;
+    pthread_cond_t cv;
+    int max;
+} maxSem;
+
 //**GLOBALS:
 static queue * ruleq = NULL;
+static pthread_mutex_t mtx;
+static maxSem * ms;
+//Binary semaphore functions that do not allow for sem post beyond the max value
+void maxSemWait(){
+    pthread_mutex_lock(&ms->sm);
+    ms->max--;
+    while (ms->max == 0) pthread_cond_wait(&ms->cv, &ms->sm);
+    ms->max = 1;
+    pthread_mutex_unlock(&ms->sm);
+}
+void maxSemPost(){
+    pthread_mutex_lock(&ms->sm);
+    if (ms->max == 0){
+        ms->max++;
+        pthread_cond_signal(&ms->cv);
+    }else{
+        ms->max++;
+    }
+    pthread_mutex_unlock(&ms->sm);
+}
 //**THREAD STARTING FUNCTION
 void * ruleExec(void * args){
     char * ctar = NULL;
@@ -32,13 +60,20 @@ void * ruleExec(void * args){
             int cmd_stat = system(cur_cmd); //Run the command
             if (cmd_stat != 0){ //System failed to execute command
                 //Either unable to start child process, or child shell failed to execute command
+                pthread_mutex_lock(&mtx);
                 crule->state = 2;
+                pthread_mutex_unlock(&mtx);
                 hasFailed = true;
                 break;
             }
         } 
-        if (! hasFailed) crule->state = 1;
+        if (! hasFailed){
+            pthread_mutex_lock(&mtx);
+            crule->state = 1;
+            pthread_mutex_unlock(&mtx);
+        }
         if (ctar) free(ctar);
+        maxSemPost();
     }
     
     return NULL;
@@ -121,9 +156,11 @@ int isAvailable(graph * dgraph, char * tar){
     //check if the current rule has been run before:
     //NOTE: This is indicated by the rule's state -> 0: Not run, 1: Satisfied, 2: Failed
     rule_t * rule = (rule_t *) graph_get_vertex_value(dgraph, (void *) tar);
+    pthread_mutex_lock(&mtx);
     if (rule->state == 1 || rule->state == 2){ //if the current rule is already satisfied or failed
         return -1;
     }
+    pthread_mutex_unlock(&mtx);
     //Current rule has NOT been run before
     //get dependencies:
     vector* dependencies = graph_neighbors(dgraph, tar); //free vector, not elements
@@ -132,15 +169,19 @@ int isAvailable(graph * dgraph, char * tar){
     for (size_t i = 0; i < n_dep; i++){
         char * cur_dep_tar = vector_get(dependencies, i);
         rule_t * cdep_rule = (rule_t *) graph_get_vertex_value(dgraph, (void *) cur_dep_tar);
+        pthread_mutex_lock(&mtx);
         if (cdep_rule->state == 2){ //if the cur dependency is failed, then the current rule will also fail
             rule->state = 2;
             vector_destroy(dependencies);
+            pthread_mutex_unlock(&mtx);
             return -1; // current rule has failed, no need to execute anymore
         }
         else if (cdep_rule->state == 0){ // dependency is not run -> cannot run the current rule
             vector_destroy(dependencies);
+            pthread_mutex_unlock(&mtx);
             return 1;
         }
+        pthread_mutex_unlock(&mtx);
     }
     //*Reaching here means all dependencies have been successfully run: run based on rule flowchart
     // /https://cs341.cs.illinois.edu/images/assignment-docs/mp/parallel_make/parmake_flowchart.svg
@@ -172,10 +213,8 @@ int isAvailable(graph * dgraph, char * tar){
             }
             time_t cur_mtime = cur_stat.st_mtime;
             size_t n_file_deps = vector_size(file_dependencies);
-            // fprintf(stdout, "**DEBUG: Rule <%s> reached here!\n", tar);
             for (size_t i = 0; i < n_file_deps; i++){
                 int dep_idx = *(int *)vector_get(file_dependencies, i);
-                // fprintf(stdout, "file dep idx: %d\n", dep_idx);
                 char * cur_dep_file = vector_get(dependencies, dep_idx);
                 struct stat cur_dep_stat;
                 if (stat(cur_dep_file, &cur_dep_stat) == -1){
@@ -211,12 +250,10 @@ void runGoal(graph * dgraph, char * goal){
     pushDepToVec(dgraph, rule_vec, vec_set, goal); //add all dependencies to the vector
     set_destroy(vec_set);
     //keep iterating through vector and execute available rules. (available means the rule needs to be executed and all of its dependencies are satisfied)
-    // printf("Evaluating goal: %s\n",goal);
     while(vector_size(rule_vec) > 0){
-        // printf("Iterating through\n");
+        bool pushed = false;
         for (size_t i = 0; i < vector_size(rule_vec); i++){
             char * ctar = (char *) vector_get(rule_vec, i);
-            // printf("%s : ", ctar);
             int tar_stat = isAvailable(dgraph, ctar);
             if (tar_stat == -1){ //Already satisfied or failed
                 vector_erase(rule_vec, i); //remove rule from vector
@@ -225,25 +262,36 @@ void runGoal(graph * dgraph, char * goal){
                 continue;
             }
             else{ // current rule is available
-                // printf("**Pushing to queue: %s\n", ctar);
                 char * ctar_heap = malloc(32);
                 strcpy(ctar_heap, ctar);
                 queue_push(ruleq, (void *) ctar_heap);
                 vector_erase(rule_vec, i);
+                pushed = true;
                 i--;
             }
         }
+        if (pushed) maxSemWait();
     }
     vector_destroy(rule_vec);
 }
 //**ENTRY
 int parmake(char *makefile, size_t num_threads, char **targets) {
     // good luck
+    // //Execution timer stuff
+    // clock_t start_time, end_time;
+    // double cpu_time_used;
+    // start_time = clock();
     //TODO: NOTE!! NEED TO FREE EVERY SINGLE VECTOR RETURNED BY DGRAPH!
     graph * dgraph = parser_parse_makefile(makefile, targets); // Create dependency graph
     vector * goals = graph_neighbors(dgraph, ""); //list of "goal" targets that we need to evaluate for //Need to free vector
     size_t ngoals = vector_size(goals); //number of "goal" targets
     //THREADS POOL AND QUEUE INITIALIZATION:
+    ms = malloc(sizeof(maxSem)); //initialize max Semaphore struct
+    ms->max = 1;
+    pthread_mutex_init(&ms->sm, NULL);
+    pthread_cond_init(&ms->cv, NULL);
+
+    pthread_mutex_init(&mtx, NULL);
     ruleq = queue_create(-1);
     pthread_t threads[num_threads];
     for (size_t t = 0; t < num_threads; t++){
@@ -278,5 +326,11 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     graph_destroy(dgraph);
     vector_destroy(goals);
     queue_destroy(ruleq);
+    pthread_mutex_destroy(&mtx);
+    // // Execution time log
+    // end_time = clock();
+    // cpu_time_used = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
+    // printf("**LOG: Execution time: %f seconds\n", cpu_time_used);
+
     return 0;
 }
