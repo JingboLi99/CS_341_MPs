@@ -21,6 +21,7 @@ s2: s1a s1b
 s2a: s2
 	echo "Stage #2"
 	sleep 5
+	echo "stage #2 complete!"
 
 
 s3: s2a

@@ -31,10 +31,10 @@ static pthread_mutex_t mtx;
 static maxSem * ms;
 //Binary semaphore functions that do not allow for sem post beyond the max value
 void maxSemWait(){
+    // printf("waiting\n");
     pthread_mutex_lock(&ms->sm);
     ms->max--;
     while (ms->max == 0) pthread_cond_wait(&ms->cv, &ms->sm);
-    ms->max = 1;
     pthread_mutex_unlock(&ms->sm);
 }
 void maxSemPost(){
@@ -42,8 +42,6 @@ void maxSemPost(){
     if (ms->max == 0){
         ms->max++;
         pthread_cond_signal(&ms->cv);
-    }else{
-        ms->max++;
     }
     pthread_mutex_unlock(&ms->sm);
 }
@@ -251,12 +249,14 @@ void runGoal(graph * dgraph, char * goal){
     set_destroy(vec_set);
     //keep iterating through vector and execute available rules. (available means the rule needs to be executed and all of its dependencies are satisfied)
     while(vector_size(rule_vec) > 0){
-        bool pushed = false;
+        // printf("*");
+        // bool pushed = false;
         for (size_t i = 0; i < vector_size(rule_vec); i++){
             char * ctar = (char *) vector_get(rule_vec, i);
             int tar_stat = isAvailable(dgraph, ctar);
             if (tar_stat == -1){ //Already satisfied or failed
                 vector_erase(rule_vec, i); //remove rule from vector
+                maxSemPost();
             }
             else if(tar_stat == 1){ //current rule is still not available: check again later
                 continue;
@@ -266,11 +266,14 @@ void runGoal(graph * dgraph, char * goal){
                 strcpy(ctar_heap, ctar);
                 queue_push(ruleq, (void *) ctar_heap);
                 vector_erase(rule_vec, i);
-                pushed = true;
+                // pushed = true;
                 i--;
             }
         }
-        if (pushed) maxSemWait();
+        // printf("%d\n", pushed);
+        // if (pushed) maxSemWait();
+        
+        maxSemWait();
     }
     vector_destroy(rule_vec);
 }
@@ -327,7 +330,7 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     vector_destroy(goals);
     queue_destroy(ruleq);
     pthread_mutex_destroy(&mtx);
-    // // Execution time log
+    // Execution time log
     // end_time = clock();
     // cpu_time_used = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
     // printf("**LOG: Execution time: %f seconds\n", cpu_time_used);
