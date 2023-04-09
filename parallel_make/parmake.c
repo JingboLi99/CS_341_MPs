@@ -17,7 +17,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <time.h>
-
+#include <semaphore.h>
 //**Semaphore struct
 typedef struct maxSem{
     pthread_mutex_t sm;
@@ -28,26 +28,27 @@ typedef struct maxSem{
 //**GLOBALS:
 static queue * ruleq = NULL;
 static pthread_mutex_t mtx;
-static maxSem * ms;
+static sem_t s;
+// static maxSem * ms;
 //Binary semaphore functions that do not allow for sem post beyond the max value
-void maxSemWait(){
-    // printf("waiting\n");
-    pthread_mutex_lock(&ms->sm);
-    ms->max--;
-    while (ms->max == 0) pthread_cond_wait(&ms->cv, &ms->sm);
-    pthread_mutex_unlock(&ms->sm);
-}
-void maxSemPost(){
-    pthread_mutex_lock(&ms->sm);
-    if (ms->max == 0){
-        ms->max++;
-        pthread_cond_signal(&ms->cv);
-    }
-    else{
-        ms->max++;
-    }
-    pthread_mutex_unlock(&ms->sm);
-}
+// void maxSemWait(){
+//     // printf("waiting\n");
+//     pthread_mutex_lock(&ms->sm);
+//     ms->max--;
+//     while (ms->max == 0) pthread_cond_wait(&ms->cv, &ms->sm);
+//     pthread_mutex_unlock(&ms->sm);
+// }
+// void maxSemPost(){
+//     pthread_mutex_lock(&ms->sm);
+//     if (ms->max == 0){
+//         ms->max++;
+//         pthread_cond_signal(&ms->cv);
+//     }
+//     else{
+//         ms->max++;
+//     }
+//     pthread_mutex_unlock(&ms->sm);
+// }
 //**THREAD STARTING FUNCTION
 void * ruleExec(void * args){
     char * ctar = NULL;
@@ -74,7 +75,7 @@ void * ruleExec(void * args){
             pthread_mutex_unlock(&mtx);
         }
         if (ctar) free(ctar);
-        maxSemPost();
+        sem_post(&s);
     }
     
     return NULL;
@@ -253,16 +254,15 @@ void runGoal(graph * dgraph, char * goal){
     //keep iterating through vector and execute available rules. (available means the rule needs to be executed and all of its dependencies are satisfied)
     while(vector_size(rule_vec) > 0){
         // printf("*");
-        // bool pushed = false;
         for (size_t i = 0; i < vector_size(rule_vec); i++){
             char * ctar = (char *) vector_get(rule_vec, i);
             int tar_stat = isAvailable(dgraph, ctar);
             if (tar_stat == -1){ //Already satisfied or failed
                 vector_erase(rule_vec, i); //remove rule from vector
-                maxSemPost();
+                sem_post(&s);
             }
             else if(tar_stat == 1){ //current rule is still not available: check again later
-                maxSemPost();
+                sem_post(&s);
                 continue;
             }
             else{ // current rule is available
@@ -270,14 +270,11 @@ void runGoal(graph * dgraph, char * goal){
                 strcpy(ctar_heap, ctar);
                 queue_push(ruleq, (void *) ctar_heap);
                 vector_erase(rule_vec, i);
-                // pushed = true;
                 i--;
             }
         }
-        // printf("%d\n", pushed);
-        // if (pushed) maxSemWait();
-        
-        maxSemWait();
+        // maxSemWait();
+        sem_wait(&s);
     }
     vector_destroy(rule_vec);
 }
@@ -293,11 +290,11 @@ int parmake(char *makefile, size_t num_threads, char **targets) {
     vector * goals = graph_neighbors(dgraph, ""); //list of "goal" targets that we need to evaluate for //Need to free vector
     size_t ngoals = vector_size(goals); //number of "goal" targets
     //THREADS POOL AND QUEUE INITIALIZATION:
-    ms = malloc(sizeof(maxSem)); //initialize max Semaphore struct
-    ms->max = 1;
-    pthread_mutex_init(&ms->sm, NULL);
-    pthread_cond_init(&ms->cv, NULL);
-
+    // ms = malloc(sizeof(maxSem)); //initialize max Semaphore struct
+    // ms->max = 1;
+    // pthread_mutex_init(&ms->sm, NULL);
+    // pthread_cond_init(&ms->cv, NULL);
+    sem_init(&s, 0, 1);
     pthread_mutex_init(&mtx, NULL);
     ruleq = queue_create(-1);
     pthread_t threads[num_threads];
