@@ -19,11 +19,11 @@
 #include <time.h>
 #include <semaphore.h>
 //**Semaphore struct
-typedef struct maxSem{
-    pthread_mutex_t sm;
-    pthread_cond_t cv;
-    int max;
-} maxSem;
+// typedef struct maxSem{
+//     pthread_mutex_t sm;
+//     pthread_cond_t cv;
+//     int max;
+// } maxSem;
 
 //**GLOBALS:
 static queue * ruleq = NULL;
@@ -254,6 +254,7 @@ void runGoal(graph * dgraph, char * goal){
     //keep iterating through vector and execute available rules. (available means the rule needs to be executed and all of its dependencies are satisfied)
     while(vector_size(rule_vec) > 0){
         // printf("*");
+        fflush(stdout);
         for (size_t i = 0; i < vector_size(rule_vec); i++){
             char * ctar = (char *) vector_get(rule_vec, i);
             int tar_stat = isAvailable(dgraph, ctar);
@@ -262,7 +263,7 @@ void runGoal(graph * dgraph, char * goal){
                 sem_post(&s);
             }
             else if(tar_stat == 1){ //current rule is still not available: check again later
-                sem_post(&s);
+                // sem_post(&s);
                 continue;
             }
             else{ // current rule is available
