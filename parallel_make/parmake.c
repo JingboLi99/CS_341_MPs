@@ -32,7 +32,6 @@ static sem_t s;
 // static maxSem * ms;
 //Binary semaphore functions that do not allow for sem post beyond the max value
 // void maxSemWait(){
-//     // printf("waiting\n");
 //     pthread_mutex_lock(&ms->sm);
 //     ms->max--;
 //     while (ms->max == 0) pthread_cond_wait(&ms->cv, &ms->sm);

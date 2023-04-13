@@ -13,10 +13,12 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <netinet/in.h>
 
 #include "utils.h"
 
 #define MAX_CLIENTS 8
+#define SO_REUSEPORT 15
 
 void *process_client(void *p);
 
@@ -27,7 +29,8 @@ static volatile int clientsCount;
 static volatile int clients[MAX_CLIENTS];
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
+//**Globals:
+// struct addrinfo *res; // possible addr structures for local address
 /**
  * Signal handler for SIGINT.
  * Used to set flag to end server.
@@ -35,6 +38,20 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 void close_server() {
     endSession = 1;
     // add any additional flags here you want.
+    if (shutdown(serverSocket, SHUT_RDWR) != 0) {
+        perror("shutdown():");
+    }
+    close(serverSocket);
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i] != -1) {
+            if (shutdown(clients[i], SHUT_RDWR) != 0) {
+                perror("shutdown(): ");
+            }
+            close(clients[i]);
+        }
+    }
+    clientsCount = 0;
 }
 
 /**
@@ -75,21 +92,72 @@ void cleanup() {
  *    - perror() for any other call
  */
 void run_server(char *port) {
-    /*QUESTION 1*/
-    /*QUESTION 2*/
-    /*QUESTION 3*/
+    // Create a server socket with the right configurations:
+    if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        fprintf(stderr, "**CLIENT ERROR: Cannot create client socket\n");
+        exit(EXIT_FAILURE);
+    }
+    // Set socket options to SO_REUSEADDR and SO_REUSEPORT
+    int optval = 1;
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval, sizeof(optval)) < 0) {
+        perror("**SERVER ERROR- setsockopt failed: ");
+        exit(EXIT_FAILURE);
+    }
+    // Bind: Binding an abstract socket to a port and network interface
+    struct addrinfo hints, *result;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    int s;
+    if ((s = getaddrinfo(NULL, port, &hints, &result)) != 0) {
+        freeaddrinfo(result);
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        exit(1);
+    }
+    // Bind the socket to the server address and port
+    if (bind(serverSocket, result->ai_addr, result->ai_addrlen) != 0) {
+        perror("**SERVER ERROR- bind failed: ");
+        exit(EXIT_FAILURE);
+    }
+    //Listen:
+    if (listen(serverSocket, MAX_CLIENTS) < 0){
+        perror("**SERVER ERROR- listen failed: ");
+        exit(EXIT_FAILURE);
+    }
+    //Accept incoming connections if any
+    // NOTE: the accept call returns a new file descriptor. 
+    // This file descriptor is specific to a particular client. We have to use this fd instead of
+    // the original server socket descriptor for the server I/O
+    struct sockaddr_storage clientaddr; //Client information
+    clientaddr.ss_family = AF_INET;
+    socklen_t clientaddrsize = sizeof(clientaddr);
+    //thread array for all each different worker thread to work on a client
+    pthread_t threads[MAX_CLIENTS];
+    while (endSession == 0){
+        pthread_mutex_lock(&mutex); //need to mutex lock to access global variables clients and clientsCount
+        if (clientsCount < MAX_CLIENTS){ //Check if we can accept a new connection
+            //Given a new connection can be made, find the first position in clients to store the new client fd
+            for (int i = 0; i < MAX_CLIENTS; i++){
+                if (clients[i] == -1 || clients[i] == 0){ //this means the cur position is available
+                    clients[i] = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
+                    if (clients[i] == -1){
+                        perror("**SERVER ERROR- Accept failed: ");
+                        exit(EXIT_FAILURE);
+                    }
+                    pthread_create(&threads[i], NULL, process_client, (void *) (intptr_t)i);
+                    clientsCount++;
+                    break;
+                }
+            }
+        }
+        pthread_mutex_unlock(&mutex);
+    }
+    freeaddrinfo(result);
 
-    /*QUESTION 8*/
-
-    /*QUESTION 4*/
-    /*QUESTION 5*/
-    /*QUESTION 6*/
-
-    /*QUESTION 9*/
-
-    /*QUESTION 10*/
-
-    /*QUESTION 11*/
+    for (int j = 0; j < MAX_CLIENTS; j++){
+        pthread_join(threads[j], NULL);
+    }
 }
 
 /**

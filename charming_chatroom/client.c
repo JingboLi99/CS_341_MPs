@@ -30,6 +30,9 @@ void close_program(int signal);
  */
 void close_server_connection() {
     // Your code here
+    shutdown(serverSocket, SHUT_RD);
+    close(serverSocket);
+    exit(EXIT_SUCCESS);
 }
 
 /**
@@ -42,17 +45,44 @@ void close_server_connection() {
  * Returns integer of valid file descriptor, or exit(1) on failure.
  */
 int connect_to_server(const char *host, const char *port) {
-    /*QUESTION 1*/
-    /*QUESTION 2*/
-    /*QUESTION 3*/
+    struct addrinfo hints, *add_structs; //hints is the constraints for the returned address structures, and results will point to the head of the linked list
+    int sockfd;
+    //Set constraints: Allow only IPv4, TCP
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_INET;    /* Allow IPv4 or IPv6 */
+    hints.ai_socktype = SOCK_STREAM; /* TCP socket */
+    hints.ai_protocol = 0;          /* Any protocol */
+    //get address structs for the server hostname
+    int getAd_res;
+    if ((getAd_res = getaddrinfo(host, port, &hints, &add_structs)) != 0){
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(getAd_res));
+        freeaddrinfo(add_structs);
+        exit(EXIT_FAILURE);
+    }
+    //Create client socket:
+    if ((sockfd = socket(hints.ai_family , hints.ai_socktype, hints.ai_protocol)) < 0){
+        perror("**CLIENT ERROR: Cannot create client socket");
+        exit(EXIT_FAILURE);
+    }
+    //make connection by looping through each addr struct until one connects (if any)
+    struct addrinfo *temp = NULL; //current addr struct we are trying to connect to
+    for (temp = add_structs; temp != NULL; temp = temp->ai_next){
+        if (connect(sockfd, temp->ai_addr, temp->ai_addrlen) != -1){ //successful connection: we do not need to try to connect to any other adr structs
+            break;
+        }
+    }
+    //Check that connection was successful
+    if (temp == NULL) {
+        perror("**CLIENT ERROR: Could not connect to server");
+        exit(EXIT_FAILURE);
+    }
 
-    /*QUESTION 4*/
-    /*QUESTION 5*/
+    if (add_structs){
+        freeaddrinfo(add_structs);
+        add_structs = NULL;
+    }
 
-    /*QUESTION 6*/
-
-    /*QUESTION 7*/
-    return -1;
+    return sockfd; //NOTE: CHECK FOR SEGFAULT FOR THIS (returning non heap memory)
 }
 
 typedef struct _thread_cancel_args {

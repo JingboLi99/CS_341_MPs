@@ -2,6 +2,12 @@
 
 
 2) What is the difference between the domains AF_INET and AF_UNIX?
+AF_INET and AF_UNIX are two different address families used in computer networking to identify communication endpoints.
+
+AF_INET is short for Address Family Internet, which is a protocol used for internet communication. It is used for communication between hosts over the internet using the Internet Protocol (IP) suite, which includes protocols like TCP (Transmission Control Protocol) and UDP (User Datagram Protocol). It uses IP addresses and port numbers to identify endpoints and establish communication between them. This address family is used in most modern networks, including the internet.
+
+AF_UNIX, on the other hand, is short for Address Family UNIX, which is a protocol used for communication between processes on the same system or host. It is used in Unix-like operating systems such as Linux, macOS, and others. It uses file system paths to identify endpoints and establish communication between them. The endpoints are typically represented as sockets in the file system.
+
 
 
 3) What is the difference between SOCK_STREAM and SOCK_DGRAM?

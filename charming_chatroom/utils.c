@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/socket.h>
 
 #include "utils.h"
 static const size_t MESSAGE_SIZE_DIGITS = 4;
@@ -32,15 +35,55 @@ ssize_t get_message_size(int socket) {
 // You may assume size won't be larger than a 4 byte integer
 ssize_t write_message_size(size_t size, int socket) {
     // Your code here
-    return 9001;
+    // char * buffer = calloc(size, sizeof(char));
+    // ssize_t wrt_bytes =
+    //     write_all_to_socket(socket, buffer, size);
+    // free(buffer);
+    // if (wrt_bytes == 0 || wrt_bytes == -1)
+    //     return wrt_bytes;
+
+    // return (ssize_t)ntohl(wrt_bytes);
+    ssize_t fixed_size = htonl(size);
+    return write_all_to_socket(socket, (char*)&fixed_size , MESSAGE_SIZE_DIGITS);
 }
 
 ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
     // Your Code Here
-    return 9001;
+    size_t b_read = 0;
+    while (b_read < count){
+        ssize_t cur_read = read(socket, buffer, count);
+        if (cur_read == 0){
+            return b_read;
+        }
+        else if (cur_read > 0){
+            b_read += cur_read;
+        }
+        else if (cur_read == -1 && errno == EINTR){
+            continue;
+        }
+        else{
+            return -1;
+        }
+    }
+    return b_read;
 }
 
 ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
-    // Your Code Here
-    return 9001;
+    size_t b_wrote = 0;
+    while (b_wrote < count){
+        ssize_t cur_wrote = write(socket, buffer, count);
+        if (cur_wrote == 0){
+            return b_wrote;
+        }
+        else if (cur_wrote > 0){
+            b_wrote += cur_wrote;
+        }
+        else if (cur_wrote == -1 && errno == EINTR){
+            continue;
+        }
+        else{
+            return -1;
+        }
+    }
+    return b_wrote;
 }
