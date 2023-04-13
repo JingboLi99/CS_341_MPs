@@ -137,9 +137,9 @@ void run_server(char *port) {
         clients[i] = -1;
     }
 
-    struct sockaddr_storage clientaddr; //Client information
-    clientaddr.ss_family = AF_INET;
-    socklen_t clientaddrsize = sizeof(clientaddr);
+    // struct sockaddr_storage clientaddr; //Client information
+    // clientaddr.ss_family = AF_INET;
+    // socklen_t clientaddrsize = sizeof(clientaddr);
     //thread array for all each different worker thread to work on a client
     pthread_t threads[MAX_CLIENTS];
     while (endSession == 0){
@@ -148,12 +148,15 @@ void run_server(char *port) {
             //Given a new connection can be made, find the first position in clients to store the new client fd
             for (int i = 0; i < MAX_CLIENTS; i++){
                 if (clients[i] == -1){ //this means the cur position is available
-                    clients[i] = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
+                    // clients[i] = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
+                    // printf("Waiting for connection...\n");
+                    clients[i] = accept(serverSocket, NULL, NULL);
                     if (clients[i] == -1){
                         perror("**SERVER ERROR- Accept failed: ");
                         exit(EXIT_FAILURE);
                     }
-                    pthread_create(&threads[i], NULL, process_client, (void *) (intptr_t)i);
+                    // printf("Connection made: client_fd=%d\n", clients[i]);
+                    pthread_create(&threads[i], NULL, process_client, (void *) (intptr_t) i);
                     clientsCount++;
                     break;
                 }
