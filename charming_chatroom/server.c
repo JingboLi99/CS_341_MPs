@@ -137,15 +137,16 @@ void run_server(char *port) {
         clients[i] = -1;
     }
 
-    // struct sockaddr_storage clientaddr; //Client information
-    // clientaddr.ss_family = AF_INET;
-    // socklen_t clientaddrsize = sizeof(clientaddr);
+    struct sockaddr_storage clientaddr; //Client information
+    clientaddr.ss_family = AF_INET;
+    socklen_t clientaddrsize = sizeof(clientaddr);
     //thread array for all each different worker thread to work on a client
     pthread_t threads[MAX_CLIENTS];
     while (endSession == 0){
         // pthread_mutex_lock(&mutex); //need to mutex lock to access global variables clients and clientsCount
         if (clientsCount < MAX_CLIENTS){ //Check if we can accept a new connection
-            int new_clientfd = accept(serverSocket, NULL, NULL);
+            // int new_clientfd = accept(serverSocket, NULL, NULL);
+            int new_clientfd = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
             if (new_clientfd == -1){
                 perror("**SERVER ERROR- Accept failed: ");
                 exit(EXIT_FAILURE);
