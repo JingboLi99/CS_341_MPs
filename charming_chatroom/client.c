@@ -24,15 +24,19 @@ void *write_to_server(void *arg);
 void *read_from_server(void *arg);
 void close_program(int signal);
 
+static struct addrinfo *add_structs;
 /**
  * Shuts down connection with 'serverSocket'.
  * Called by close_program upon SIGINT.
  */
 void close_server_connection() {
     // Your code here
+    if (add_structs){
+        freeaddrinfo(add_structs);
+        add_structs = NULL;
+    }
     shutdown(serverSocket, SHUT_RD);
     close(serverSocket);
-    exit(EXIT_SUCCESS);
 }
 
 /**
@@ -45,7 +49,7 @@ void close_server_connection() {
  * Returns integer of valid file descriptor, or exit(1) on failure.
  */
 int connect_to_server(const char *host, const char *port) {
-    struct addrinfo hints, *add_structs; //hints is the constraints for the returned address structures, and results will point to the head of the linked list
+    struct addrinfo hints; //hints is the constraints for the returned address structures, and results will point to the head of the linked list
     int sockfd;
     //Set constraints: Allow only IPv4, TCP
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -56,12 +60,13 @@ int connect_to_server(const char *host, const char *port) {
     int getAd_res;
     if ((getAd_res = getaddrinfo(host, port, &hints, &add_structs)) != 0){
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(getAd_res));
-        freeaddrinfo(add_structs);
+        if (add_structs) freeaddrinfo(add_structs);
         exit(EXIT_FAILURE);
     }
     //Create client socket:
     if ((sockfd = socket(hints.ai_family , hints.ai_socktype, hints.ai_protocol)) < 0){
         perror("**CLIENT ERROR: Cannot create client socket");
+        if (add_structs) freeaddrinfo(add_structs);
         exit(EXIT_FAILURE);
     }
     //make connection by looping through each addr struct until one connects (if any)
@@ -74,6 +79,7 @@ int connect_to_server(const char *host, const char *port) {
     //Check that connection was successful
     if (temp == NULL) {
         perror("**CLIENT ERROR: Could not connect to server");
+        if (add_structs) freeaddrinfo(add_structs);
         exit(EXIT_FAILURE);
     }
 
