@@ -49,11 +49,11 @@ ssize_t write_message_size(size_t size, int socket) {
 
 ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
     // Your Code Here
-    size_t b_read = 0;
-    while (b_read < count){
-        ssize_t cur_read = read(socket, buffer, count);
+    ssize_t b_read = 0;
+    while (b_read < (ssize_t) count){
+        ssize_t cur_read = read(socket, buffer + b_read, count - b_read);
         if (cur_read == 0){
-            return b_read;
+            break;
         }
         else if (cur_read > 0){
             b_read += cur_read;
@@ -69,11 +69,11 @@ ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
 }
 
 ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
-    size_t b_wrote = 0;
-    while (b_wrote < count){
-        ssize_t cur_wrote = write(socket, buffer, count);
+    ssize_t b_wrote = 0;
+    while (b_wrote < (ssize_t) count){
+        ssize_t cur_wrote = write(socket, buffer + b_wrote, count - b_wrote);
         if (cur_wrote == 0){
-            return b_wrote;
+            break;
         }
         else if (cur_wrote > 0){
             b_wrote += cur_wrote;
