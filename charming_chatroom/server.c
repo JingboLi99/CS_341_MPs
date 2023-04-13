@@ -137,23 +137,24 @@ void run_server(char *port) {
         clients[i] = -1;
     }
 
-    // struct sockaddr_storage clientaddr; //Client information
-    // clientaddr.ss_family = AF_INET;
-    // socklen_t clientaddrsize = sizeof(clientaddr);
+    struct sockaddr_storage clientaddr; //Client information
+    clientaddr.ss_family = AF_INET;
+    socklen_t clientaddrsize = sizeof(clientaddr);
     //thread array for all each different worker thread to work on a client
     pthread_t threads[MAX_CLIENTS];
     while (endSession == 0){
-        // pthread_mutex_lock(&mutex); //need to mutex lock to access global variables clients and clientsCount
+        pthread_mutex_lock(&mutex); //need to mutex lock to access global variables clients and clientsCount
         if (clientsCount < MAX_CLIENTS){ //Check if we can accept a new connection
             
             //Given a new connection can be made, find the first position in clients to store the new client fd
             for (int i = 0; i < MAX_CLIENTS; i++){
                 if (clients[i] == -1){ //this means the cur position is available
-                    // clients[i] = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
+                    clients[i] = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
                     // printf("Waiting for connection...\n");
-                    clients[i] = accept(serverSocket, NULL, NULL);
+                    // clients[i] = accept(serverSocket, NULL, NULL);
                     if (clients[i] == -1){
                         perror("**SERVER ERROR- Accept failed: ");
+                        pthread_mutex_unlock(&mutex);
                         exit(EXIT_FAILURE);
                     }
                     // printf("Connection made: client_fd=%d\n", clients[i]);
@@ -163,7 +164,7 @@ void run_server(char *port) {
                 }
             }
         }
-        // pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&mutex);
     }
     freeaddrinfo(result);
 
