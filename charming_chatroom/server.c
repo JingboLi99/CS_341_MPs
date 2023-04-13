@@ -145,18 +145,18 @@ void run_server(char *port) {
     while (endSession == 0){
         // pthread_mutex_lock(&mutex); //need to mutex lock to access global variables clients and clientsCount
         if (clientsCount < MAX_CLIENTS){ //Check if we can accept a new connection
-            // printf("Waiting for connection...\n");
-            int new_clientfd = accept(serverSocket, NULL, NULL);
-            if (new_clientfd == -1){
-                perror("**SERVER ERROR- Accept failed: ");
-                exit(EXIT_FAILURE);
-            }
-            // printf("Connection made: client_fd=%d\n", new_clientfd);
+            
             //Given a new connection can be made, find the first position in clients to store the new client fd
             for (int i = 0; i < MAX_CLIENTS; i++){
                 if (clients[i] == -1){ //this means the cur position is available
                     // clients[i] = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
-                    clients[i] = new_clientfd;
+                    // printf("Waiting for connection...\n");
+                    clients[i] = accept(serverSocket, NULL, NULL);
+                    if (clients[i] == -1){
+                        perror("**SERVER ERROR- Accept failed: ");
+                        exit(EXIT_FAILURE);
+                    }
+                    // printf("Connection made: client_fd=%d\n", clients[i]);
                     pthread_create(&threads[i], NULL, process_client, (void *) (intptr_t) i);
                     clientsCount++;
                     break;
