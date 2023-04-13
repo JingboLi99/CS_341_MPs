@@ -99,8 +99,12 @@ void run_server(char *port) {
     }
     // Set socket options to SO_REUSEADDR and SO_REUSEPORT
     int optval = 1;
-    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &optval, sizeof(optval)) < 0) {
-        perror("**SERVER ERROR- setsockopt failed: ");
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval)) < 0) {
+        perror("**SERVER ERROR- setsockopt SO_REUSEPORT failed: ");
+        exit(EXIT_FAILURE);
+    }
+    if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+        perror("**SERVER ERROR- setsockopt SO_REUSEADDR failed: ");
         exit(EXIT_FAILURE);
     }
     // Bind: Binding an abstract socket to a port and network interface
@@ -121,7 +125,7 @@ void run_server(char *port) {
         exit(EXIT_FAILURE);
     }
     //Listen:
-    if (listen(serverSocket, MAX_CLIENTS) < 0){
+    if (listen(serverSocket, 16) < 0){
         perror("**SERVER ERROR- listen failed: ");
         exit(EXIT_FAILURE);
     }
@@ -129,6 +133,10 @@ void run_server(char *port) {
     // NOTE: the accept call returns a new file descriptor. 
     // This file descriptor is specific to a particular client. We have to use this fd instead of
     // the original server socket descriptor for the server I/O
+    for(int i = 0; i < MAX_CLIENTS; i++){
+        clients[i] = -1;
+    }
+
     struct sockaddr_storage clientaddr; //Client information
     clientaddr.ss_family = AF_INET;
     socklen_t clientaddrsize = sizeof(clientaddr);
@@ -139,7 +147,7 @@ void run_server(char *port) {
         if (clientsCount < MAX_CLIENTS){ //Check if we can accept a new connection
             //Given a new connection can be made, find the first position in clients to store the new client fd
             for (int i = 0; i < MAX_CLIENTS; i++){
-                if (clients[i] == -1 || clients[i] == 0){ //this means the cur position is available
+                if (clients[i] == -1){ //this means the cur position is available
                     clients[i] = accept(serverSocket, (struct sockaddr *) &clientaddr, &clientaddrsize);
                     if (clients[i] == -1){
                         perror("**SERVER ERROR- Accept failed: ");
