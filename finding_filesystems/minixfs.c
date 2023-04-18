@@ -48,22 +48,16 @@ int minixfs_virtual_path_count =
 int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
     // TODO: Do I have to check if the current user can change the inode mode? if so how?
     // printf("Permission: %d\n", new_permissions);
-    uint16_t new_bits = new_permissions & 0x1FF;
-    // printf("restricted: %d\n", new_bits);
     inode * in = get_inode(fs, path); //get the inode of path
     if (in){ //if the path exists
         uint16_t in_md = in->mode; //get the current mode int
-        // printf("cur mode: %d\n", in_md);
-        in_md = (in_md & ~0x1FF) | new_bits; //clear the bottom 9 bits and set to the new 9 bits
-        // printf("new mode: %d\n", in_md);
-        // return 0;
-        in->mode = in_md;
+        uint16_t reserved = in_md >> RWX_BITS_NUMBER;
+        in->mode = new_permissions | (reserved << RWX_BITS_NUMBER);
         clock_gettime(CLOCK_REALTIME, &in->ctim); //change ctim
         return 0;
     }
     else{
         errno = ENOENT;
-        perror("CHMOD ERROR: ");
         return -1;
     }
 }
@@ -72,23 +66,17 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
     // Land ahoy!
     inode * in = get_inode(fs, path);
     if (in){
-        bool success = false; //checks if any modifications have been made
         if (owner != (uid_t) -1){ //check if new uid to change to is valid
             in->uid = owner;
-            success = true;
         }
         if (group != (gid_t) -1){ //check if new gid to change to is valid
             in->gid = group;
-            success = true;
         }
-        if (success){
-            clock_gettime(CLOCK_REALTIME, &in->ctim); //change ctim
-        }
+        clock_gettime(CLOCK_REALTIME, &in->ctim); //change ctim
         return 0;
     }
     else{
         errno = ENOENT;
-        perror("CHOWN ERROR: ");
         return -1;
     }
 }
