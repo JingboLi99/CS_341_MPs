@@ -24,7 +24,7 @@ int main() {
     //open /goodies/hello.txt with open() or fopen() and read the contents way you normally would
     //TEST CHOWN
     //TEST CHMOD
-    
+    minixfs_chmod(fs, "/goodies/hello.txt", 1234);
 
     close_fs(&fs);
 }

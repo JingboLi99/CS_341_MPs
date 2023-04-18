@@ -47,20 +47,25 @@ int minixfs_virtual_path_count =
 
 int minixfs_chmod(file_system *fs, char *path, int new_permissions) {
     // TODO: Do I have to check if the current user can change the inode mode? if so how?
-    uint16_t new_bits = new_permissions & 0xFF;
+    // printf("Permission: %d\n", new_permissions);
+    uint16_t new_bits = new_permissions & 0x1FF;
+    // printf("restricted: %d\n", new_bits);
     inode * in = get_inode(fs, path); //get the inode of path
     if (in){ //if the path exists
         uint16_t in_md = in->mode; //get the current mode int
-        in_md = (in_md & 0xFE00) | new_bits; //clear the bottom 9 bits and set to the new 9 bits
+        // printf("cur mode: %d\n", in_md);
+        in_md = (in_md & ~0x1FF) | new_bits; //clear the bottom 9 bits and set to the new 9 bits
+        // printf("new mode: %d\n", in_md);
+        // return 0;
         in->mode = in_md;
         clock_gettime(CLOCK_REALTIME, &in->ctim); //change ctim
+        return 0;
     }
     else{
         errno = ENOENT;
         perror("CHMOD ERROR: ");
         return -1;
     }
-    return 0;
 }
 
 int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
@@ -78,9 +83,8 @@ int minixfs_chown(file_system *fs, char *path, uid_t owner, gid_t group) {
         }
         if (success){
             clock_gettime(CLOCK_REALTIME, &in->ctim); //change ctim
-            return 0;
         }
-        return -1;
+        return 0;
     }
     else{
         errno = ENOENT;
