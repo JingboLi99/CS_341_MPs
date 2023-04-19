@@ -1,0 +1,20 @@
+Running thread 1
+Running thread 2
+Running thread 2
+Running thread 3
+Running thread 3
+Running thread 3
+Running thread 4
+Running thread 4
+Running thread 4
+Running thread 4
+Running thread 5
+Running thread 5
+Running thread 5
+Running thread 5
+Running thread 5
+Timer start!
+Timer start!
+Timer start!
+Timer start!
+Timer start!
