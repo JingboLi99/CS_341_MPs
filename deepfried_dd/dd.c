@@ -29,7 +29,6 @@ void sig_handler(){
     double elapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000000000 + (end_time.tv_nsec - start_time.tv_nsec)) / 1000000000.0;
     print_status_report(n_fullblks, n_ptblks, n_fullblks, n_ptblks, 
                         total_copied, elapsed_time);
-    exit(EXIT_SUCCESS);
 }
 void parseInputs(int argc, char ** argv, 
             char ** infile, bool * hasIn, char ** outfile, bool * hasOut, size_t * blk_size, 
@@ -72,6 +71,8 @@ void parseInputs(int argc, char ** argv,
 }
 
 int main(int argc, char **argv) {
+    // signal handler:
+    signal(SIGUSR1, sig_handler);
     char * infile = calloc(128, 1); bool hasIn = false;
     char * outfile = calloc(128, 1); bool hasOut = false;
     size_t blk_size = 512; //size of each block
@@ -80,12 +81,11 @@ int main(int argc, char **argv) {
     size_t out_blkskip = 0; // number of BLOCK offset from start for output file
     //Start time: 
     clock_gettime(CLOCK_MONOTONIC, &start_time);
+    // clock_t before = clock();
     //parse inputs
     parseInputs(argc, argv, &infile, &hasIn, &outfile, &hasOut, &blk_size, &blks_toCopy, &in_blkskip, &out_blkskip);
     // fprintf(stderr, "\n%s, %d, %s, %d, %zu, %zu, %zu, %zu\n", infile, hasIn, outfile, hasOut, blk_size, blks_toCopy, in_blkskip, out_blkskip);
     fflush(stderr);
-    // signal handler:
-    signal(SIGUSR1, sig_handler);
     // configure input file pointer:
     FILE * fin = stdin; //input file defaults to stdin
     if (hasIn) fin = fopen(infile, "rb");
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
     // printf("\n");
     //Do end of copy status report:
     clock_gettime(CLOCK_MONOTONIC, &end_time);
-    double elapsed_time = ((end_time.tv_sec - start_time.tv_sec) * 1000000000 + (end_time.tv_nsec - start_time.tv_nsec)) / 1000000000.0;
+    double elapsed_time = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_nsec - start_time.tv_nsec) / 1000000000.0;
     print_status_report(n_fullblks, n_ptblks, n_fullblks, n_ptblks, 
                         total_copied, elapsed_time);
     if (infile) free(infile);
