@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     //parse inputs
     parseInputs(argc, argv, &infile, &hasIn, &outfile, &hasOut, &blk_size, &blks_toCopy, &in_blkskip, &out_blkskip);
-    fprintf(stderr, "\n%s, %d, %s, %d, %zu, %zu, %zu, %zu\n", infile, hasIn, outfile, hasOut, blk_size, blks_toCopy, in_blkskip, out_blkskip);
+    // fprintf(stderr, "\n%s, %d, %s, %d, %zu, %zu, %zu, %zu\n", infile, hasIn, outfile, hasOut, blk_size, blks_toCopy, in_blkskip, out_blkskip);
     fflush(stderr);
     // signal handler:
     signal(SIGUSR1, sig_handler);
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     FILE * fin = stdin; //input file defaults to stdin
     if (hasIn) fin = fopen(infile, "rb");
     if (!fin){
-        printf("INPUT FAILED\n");
+        // printf("INPUT FAILED\n");
         print_invalid_input(infile);
         return 1;
     }
@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
     FILE * fout = stdout; //output file defaults to stdout
     if (hasOut) fout = fopen(outfile, "wb+");
     if (!fout){
-        printf("output FAILED\n");
+        // printf("output FAILED\n");
         print_invalid_output(outfile);
         if (fin) fclose(fin);
         return 1;
