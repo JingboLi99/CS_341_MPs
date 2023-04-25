@@ -49,14 +49,14 @@ int main(int argc, char **argv) {
   //Parse and check prerequisites
   if (argc < 3){ //take into account the program name as 1st arg
     printArgumentUsage();
-    return -1;
+    exit(1);
   }
   char * infilename = argv[1]; //input filename
   size_t nWords = argc-2; //number of word arguments
   FILE * tf = fopen(infilename, "r"); //open tree file (tf)
   if (!tf){ //check input file exists
     openFail(infilename);
-    return -1;
+    exit(2);
   }
   // check first 4 bytes are BTRE
   char firstFour[5];
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
   fread(firstFour, 1, 4, tf);
   if (strcmp(firstFour, "BTRE") != 0){
     formatFail(infilename);
-    return -1;
+    exit(2);
   }
   for (size_t i = 0; i < nWords; i++){
     bool found = rec_find(tf, BINTREE_ROOT_NODE_OFFSET, argv[i+2]);
