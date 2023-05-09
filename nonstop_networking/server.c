@@ -132,6 +132,7 @@ void close_server(){
       closedir(d);
     } else puts("fail");
     rmdir(tdir);
+    free(tdir);
 	exit(1);
 }
 void cleanup(){
@@ -210,17 +211,19 @@ int command_handler(char * cmd, char * filename, int client_fd){
 }
 // Given a valid connection with the client_fd, process the request and do required actions:
 int process_client(int client_fd){
+    int res = 0;
     char * fline = get_firstline(client_fd);// need to free fline
     if (!fline || strlen(fline) < 4){
         print_invalid_response();
         send_error_msg(client_fd, err_bad_request);
+        if (fline) free(fline);
         return -1;
     }
     //Find the space, if any:
     char * space = strchr(fline, ' ');
     if (space == NULL){ //no space -> command should be list
         if (strcmp(fline, "LIST") == 0){
-            return command_handler("LIST", NULL, client_fd);
+            res = command_handler("LIST", NULL, client_fd);
         }else{
             print_invalid_response();
             send_error_msg(client_fd, err_bad_request);
@@ -239,13 +242,13 @@ int process_client(int client_fd){
         command[left_len] = '\0'; // have to add the ending char
         //copy string right of space:
         strcpy(filename, space+1); // already includes ending char
-        command_handler(command, filename, client_fd);
+        res = command_handler(command, filename, client_fd);
         //free malloced
         if (filename) free(filename);
         if (command) free(command);
     }  
     if (fline) free(fline);
-    return 0;
+    return res;
 }
 void run_server(char * port){
     // Create a server socket with the right configurations:
@@ -395,38 +398,71 @@ int main(int argc, char **argv) {
 }
 
 int list_handler(int cfd){
-    char file_list[8192]; //char arr to contain all the "[filename]\n"
-    strcpy(file_list, "");
-    //append all the filenames to our list in a single string
+    //send header: OK\n
+    char *header = "OK\n";
+    write_all_to_socket(cfd, header, strlen(header));
     DIR * dir = opendir(tdir);
     if (!dir){
         perror("Error opening directory\n");
         return -1;
     }
+    size_t totalsize = 0; //total size of all filenames
+    size_t nfiles = 0; //total number of files
     struct dirent * cfile;
     while ((cfile = readdir(dir)) != NULL){
-        strcat(file_list, cfile->d_name);
-        strcat(file_list, "\n");
+        char cfilename[1024];
+        strcpy(cfilename, cfile->d_name);
+        totalsize += (strlen(cfilename) + 1);
+        nfiles ++;
     }
-    ssize_t filels_size = strlen(file_list); //keep track of the size of cummulative sum of "[filename]\n" sizes 
-    file_list[filels_size-1] = '\0'; // remove the last nextline character
-    filels_size --;
-    //send header: OK\n
-    char *header = "OK\n";
-    ssize_t header_written = write_all_to_socket(cfd, header, strlen(header));
-    //send message length
-    ssize_t msg_len_written = write_message_size(filels_size, cfd);
-    if (header_written == -1 || msg_len_written == -1){
-        // fprintf(stderr, "LIST ERROR: Unable to write header or msg size\n");
-        return -1;
+    if (totalsize >= 1) totalsize--;
+    write_message_size(totalsize, cfd);
+    closedir(dir);
+    dir = NULL;
+    DIR * ddir = opendir(tdir);
+    struct dirent * dfile;
+    size_t cter = 0;
+    while ((dfile = readdir(ddir)) != NULL){
+        write_all_to_socket(cfd, dfile->d_name, strlen(dfile->d_name));
+        if (cter != nfiles-1) write_all_to_socket(cfd, "\n", 1);
     }
-    //send message body
-    ssize_t sent_len = write_all_to_socket(cfd, file_list, filels_size);
-    if (sent_len < filels_size){
-        // fprintf(stderr, "LIST ERROR: Did not write entire message to client\n");
-        return -1;
-    }
+    closedir(dir);
     return 0;
+
+
+
+    // char file_list[131072]; //char arr to contain all the "[filename]\n"
+    // strcpy(file_list, "");
+    // //append all the filenames to our list in a single string
+    // DIR * dir = opendir(tdir);
+    // if (!dir){
+    //     perror("Error opening directory\n");
+    //     return -1;
+    // }
+    // struct dirent * cfile;
+    // while ((cfile = readdir(dir)) != NULL){
+    //     strcat(file_list, cfile->d_name);
+    //     strcat(file_list, "\n");
+    // }
+    // ssize_t filels_size = strlen(file_list); //keep track of the size of cummulative sum of "[filename]\n" sizes 
+    // file_list[filels_size-1] = '\0'; // remove the last nextline character
+    // filels_size --;
+    // //send header: OK\n
+    // char *header = "OK\n";
+    // ssize_t header_written = write_all_to_socket(cfd, header, strlen(header));
+    // //send message length
+    // ssize_t msg_len_written = write_message_size(filels_size, cfd);
+    // // if (header_written == -1 || msg_len_written == -1){
+    // //     // fprintf(stderr, "LIST ERROR: Unable to write header or msg size\n");
+    // //     return -1;
+    // // }
+    // //send message body
+    // ssize_t sent_len = write_all_to_socket(cfd, file_list, filels_size);
+    // if (sent_len < filels_size){
+    //     // fprintf(stderr, "LIST ERROR: Did not write entire message to client\n");
+    //     return -1;
+    // }
+    // return 0;
 }
 int get_handler(char * filename, int cfd){
     //get the path of the file to get
