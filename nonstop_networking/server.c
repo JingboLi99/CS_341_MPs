@@ -171,12 +171,12 @@ char * get_firstline(int client_fd){
             }
         }
         else{
-            fprintf(stderr, "HEADER ERROR: Unable to read request header");
+            // fprintf(stderr, "HEADER ERROR: Unable to read request header");
             return NULL;
         }
     }
     if (bytes_read >= 1024){
-        fprintf(stderr, "HEADER ERROR: header size larger than 1024");
+        // fprintf(stderr, "HEADER ERROR: header size larger than 1024");
         return NULL;
     }
     return fline;
@@ -220,7 +220,7 @@ int process_client(int client_fd){
     char * space = strchr(fline, ' ');
     if (space == NULL){ //no space -> command should be list
         if (strcmp(fline, "LIST") == 0){
-            command_handler("LIST", NULL, client_fd);
+            return command_handler("LIST", NULL, client_fd);
         }else{
             print_invalid_response();
             send_error_msg(client_fd, err_bad_request);
@@ -250,7 +250,7 @@ int process_client(int client_fd){
 void run_server(char * port){
     // Create a server socket with the right configurations:
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-        fprintf(stderr, "**CLIENT ERROR: Cannot create client socket\n");
+        // fprintf(stderr, "**CLIENT ERROR: Cannot create client socket\n");
         exit(EXIT_FAILURE);
     }
     // Set socket options to SO_REUSEADDR and SO_REUSEPORT
@@ -277,7 +277,7 @@ void run_server(char * port){
     int s;
     if ((s = getaddrinfo(NULL, port, &hints, &result)) != 0) {
         freeaddrinfo(result);
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+        // fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
         close_server();
         exit(EXIT_FAILURE);
     }
@@ -341,7 +341,7 @@ void run_server(char * port){
                 // Set client to non-blocking:
                 if (set_nonblocking(new_client_fd) < 0){
                     close(new_client_fd);
-                    fprintf(stderr, "Unable to set new client as non-blocking\n");
+                    // fprintf(stderr, "Unable to set new client as non-blocking\n");
                     continue;
                 }
                 // Add client to epoll set:
@@ -358,8 +358,9 @@ void run_server(char * port){
                 // Handle client socket
                 int client_fd = inevents[i].data.fd;
                 int res = process_client(client_fd);
+                close_client(client_fd);
                 if (res == -1){
-                    fprintf(stderr, "***Client process error\n");
+                    // fprintf(stderr, "***Client process error\n");
                 }
             }
         }
@@ -400,7 +401,6 @@ int list_handler(int cfd){
     DIR * dir = opendir(tdir);
     if (!dir){
         perror("Error opening directory\n");
-        close_client(cfd);
         return -1;
     }
     struct dirent * cfile;
@@ -417,18 +417,15 @@ int list_handler(int cfd){
     //send message length
     ssize_t msg_len_written = write_message_size(filels_size, cfd);
     if (header_written == -1 || msg_len_written == -1){
-        fprintf(stderr, "LIST ERROR: Unable to write header or msg size\n");
-        close_client(cfd);
+        // fprintf(stderr, "LIST ERROR: Unable to write header or msg size\n");
         return -1;
     }
     //send message body
     ssize_t sent_len = write_all_to_socket(cfd, file_list, filels_size);
     if (sent_len < filels_size){
-        fprintf(stderr, "LIST ERROR: Did not write entire message to client\n");
-        close_client(cfd);
+        // fprintf(stderr, "LIST ERROR: Did not write entire message to client\n");
         return -1;
     }
-    close_client(cfd);
     return 0;
 }
 int get_handler(char * filename, int cfd){
@@ -448,7 +445,7 @@ int get_handler(char * filename, int cfd){
     size_t headerLen = strlen(headerMsg);
     ssize_t bRead_header = write_all_to_socket(cfd, headerMsg, headerLen); //write to socket
     if (bRead_header == -1){
-        printf("**GET ERROR: Unable to write header info to client\n"); fflush(stdout);
+        // printf("**GET ERROR: Unable to write header info to client\n"); fflush(stdout);
         return -1;
     }
     write_message_size(toReadSize, cfd);
@@ -466,9 +463,8 @@ int get_handler(char * filename, int cfd){
         if ((bRead_cur = fread(buffer, 1, cur_toRead, lf)) > 0){ // Still have data to read
             ssize_t act_wrote = write_all_to_socket(cfd, buffer, bRead_cur);
             if (act_wrote != bRead_cur){
-                printf("**GET ERROR: Write to client failed!\n"); 
+                // printf("**GET ERROR: Write to client failed!\n"); 
                 if (lf) fclose(lf);
-                close_client(cfd);
                 return -1;
             } 
             toReadSize -= bRead_cur;
@@ -477,7 +473,6 @@ int get_handler(char * filename, int cfd){
         else break; //Nothing left to read
     }
     if (lf) fclose(lf);
-    close_client(cfd);
     return 0;
 }
 int put_handler(char * filename, int cfd){
@@ -488,14 +483,13 @@ int put_handler(char * filename, int cfd){
     ssize_t toReadSize = get_message_size(cfd); //Number of bytes to read from the socket
     size_t ogReadSize = toReadSize;
     if (toReadSize == -1){
-        printf("**PUT ERROR: Unable to read size of incoming client file\n");
-        close_client(cfd);
+        // printf("**PUT ERROR: Unable to read size of incoming client file\n");
         return -1;
     }
     FILE * lf = fopen(path, "w+"); //open the local file for writing
     if (!lf){ // Check if the local file exists or successfully created
         send_error_msg(cfd, err_no_such_file);
-        fprintf(stderr, "THIS SHOULD NOT BE CALLED\n");
+        // fprintf(stderr, "THIS SHOULD NOT BE CALLED\n");
         return -1;
     }
     size_t hasWritten = 0;
@@ -513,7 +507,7 @@ int put_handler(char * filename, int cfd){
                 hasWritten += bRead_cur;
             }
             else {
-                printf("**PUT ERROR: Read from client failed\n");
+                // printf("**PUT ERROR: Read from client failed\n");
                 success = false;
                 break;
             }
@@ -527,7 +521,6 @@ int put_handler(char * filename, int cfd){
         }
     }
     if (lf) fclose(lf);
-    close_client(cfd);
     // fprintf(stderr, "toRead: %zu hasWritten; %zu", ogReadSize, hasWritten);
     if (hasWritten < ogReadSize){
         send_error_msg(cfd, err_bad_file_size);
@@ -545,7 +538,6 @@ int del_handler(char * filename, int cfd){
     FILE * lf = fopen(path, "r");
     if (!lf){ //file does not exist
         send_error_msg(cfd, err_no_such_file);
-        close_client(cfd);
         return -1;
     }
     fclose(lf);
@@ -553,7 +545,6 @@ int del_handler(char * filename, int cfd){
     int unlink_res;
     if ((unlink_res = unlink(path)) != 0){
         perror("DELETE ERROR: Unable to delete file\n");
-        close_client(cfd);
         return -1;
     }
     return 0;
@@ -564,5 +555,4 @@ void send_error_msg(int cfd, const char * msg){
     sprintf(resp, "ERROR\n%s\n", msg);
     int resp_len = strlen(resp);
     write_all_to_socket(cfd, resp, resp_len);
-    close_client(cfd);
 }
