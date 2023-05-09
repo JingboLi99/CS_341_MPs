@@ -215,31 +215,26 @@ static int test_comparer_ppri(void) {
     // check j1 should run next
     job *j_to_run = scheduler_quantum_expired(NULL, 0);
     assert(j_to_run == j1);
-
     // schedule job2
     job *j2 = make_and_schedule_new_job(10, 1, 1);
 
     // check j2 should run next
     j_to_run = scheduler_quantum_expired(j_to_run, 1);
     assert(j_to_run == j2);
-
     // schedule job3
     job *j3 = make_and_schedule_new_job(10, 1, 2);
 
     // check j2 should still run next, because it arrives earlier than j3
     j_to_run = scheduler_quantum_expired(j_to_run, 2);
     assert(j_to_run == j2);
-
     scheduler_job_finished(j2, 11);
     // should be j3's turn
     j_to_run = scheduler_quantum_expired(NULL, 11);
     assert(j_to_run == j3);
-
     scheduler_job_finished(j3, 21);
     // back to j1
     j_to_run = scheduler_quantum_expired(NULL, 21);
     assert(j_to_run == j1);
-
     scheduler_job_finished(j1, 30);
     free(j1);
     free(j2);

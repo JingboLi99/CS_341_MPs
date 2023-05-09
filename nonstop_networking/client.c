@@ -77,8 +77,7 @@ ssize_t write_all_to_socket(int socket, const char *buffer, size_t count) {
 ssize_t get_message_size(int socket) {
     int64_t size;
     // char * testsize = malloc(128);
-    ssize_t read_bytes = 
-        read_all_from_socket(socket, (char *)&size, MESSAGE_SIZE_DIGITS);
+    ssize_t read_bytes = read_all_from_socket(socket, (char *)&size, MESSAGE_SIZE_DIGITS);
     if (read_bytes == 0 || read_bytes == -1)
         return read_bytes;
     // printf("read bytes: %zu, Read Message size: %ld\n", read_bytes, size);
@@ -383,16 +382,6 @@ int list_handler(void){
                 success = false;
                 break;
             }
-            // else if (bRead_cur == 0){
-            //     print_too_little_data();
-            //     success = false;
-            //     break;
-            // }
-            // else {
-            //     printf("**GET ERROR: Read from server failed\n");
-            //     success = false;
-            //     break;
-            // }
         }else{ //No more data to read, do read one more time to see if we can get more data than specified
             ssize_t try_more = read_all_from_socket(serverSocket, buffer, 1);
             if (try_more > 0){

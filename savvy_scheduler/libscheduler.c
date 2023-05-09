@@ -29,7 +29,7 @@ typedef struct _job_info {
     double remtime; //remaining time
     double stime; // start time: cpu actually started working on it
     double priority; //from the initializer value
-    double rec_runtime; //number of quantas ran
+    double nquantas; //number of quantas ran
 } job_info;
 
 void scheduler_start_up(scheme_t s) {
@@ -118,12 +118,12 @@ int comparer_psrtf(const void *a, const void *b) {
 
 int comparer_rr(const void *a, const void *b) {
     // TODO: Implement me!
-    if (((job_info *)(((job *) a)->metadata))->rec_runtime < 
-        ((job_info *)(((job *) b)->metadata))->rec_runtime){
+    if (((job_info *)(((job *) a)->metadata))->nquantas < 
+        ((job_info *)(((job *) b)->metadata))->nquantas){
             return -1;
         }
-    else if (((job_info *)(((job *) a)->metadata))->rec_runtime > 
-             ((job_info *)(((job *) b)->metadata))->rec_runtime){
+    else if (((job_info *)(((job *) a)->metadata))->nquantas > 
+             ((job_info *)(((job *) b)->metadata))->nquantas){
             return 1;
         }
     return break_tie(a, b); // tie breaker using fcfs
@@ -154,13 +154,14 @@ void scheduler_new_job(job *newjob, int job_number, double time,
     new_Jinfo->reqtime = sched_data->running_time;
     new_Jinfo->remtime = sched_data->running_time;
     new_Jinfo->priority = sched_data->priority;
-    new_Jinfo->rec_runtime = -1; //Not initialized
+    new_Jinfo->nquantas = 0; //Not initialized
     newjob->metadata = (void *) new_Jinfo;
     priqueue_offer(&pqueue, newjob);
 }
 
 job *scheduler_quantum_expired(job *job_evicted, double time) {
     // TODO: Implement me!
+    // printf("quantum\n");fflush(stdout);
     if (job_evicted == NULL) return (job *) priqueue_peek(&pqueue);
     // Update metadata info:
     job_info * mtdt = (job_info *) job_evicted->metadata;
@@ -168,7 +169,7 @@ job *scheduler_quantum_expired(job *job_evicted, double time) {
         mtdt->stime = time-1;
     }
     mtdt->remtime -= 1;
-    mtdt->rec_runtime = time;
+    mtdt->nquantas += 1;
     if (priqueue_size(&pqueue) <= 0) return NULL;
     // if scheme is non preemptive, continue with current job
     if (pqueue_scheme == FCFS || pqueue_scheme == PRI || pqueue_scheme == SJF){
@@ -177,7 +178,6 @@ job *scheduler_quantum_expired(job *job_evicted, double time) {
     job * next_job = priqueue_poll(&pqueue);
     priqueue_offer(&pqueue, next_job);
     return priqueue_peek(&pqueue);
-
 }
 
 void scheduler_job_finished(job *job_done, double time) { //time is end time
@@ -227,7 +227,7 @@ void scheduler_show_queue() {
         printf("--arrive time: %f\n", info->atime);
         printf("--starttime: %f\n", info->stime);
         printf("--required time: %f\n", info->reqtime);
-        printf("--recently ran: %f\n", info->rec_runtime);
+        printf("--recently ran: %f\n", info->nquantas);
         printf("--remaining time: %f\n", info->remtime);
         priqueue_offer(&pqueue, curr);
     }
