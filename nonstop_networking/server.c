@@ -410,9 +410,7 @@ int list_handler(int cfd){
     size_t nfiles = 0; //total number of files
     struct dirent * cfile;
     while ((cfile = readdir(dir)) != NULL){
-        char cfilename[1024];
-        strcpy(cfilename, cfile->d_name);
-        totalsize += (strlen(cfilename) + 1);
+        totalsize += (strlen(cfile->d_name) + 1);
         nfiles ++;
     }
     if (totalsize >= 1) totalsize--;
@@ -428,45 +426,11 @@ int list_handler(int cfd){
     }
     closedir(dir);
     return 0;
-
-
-
-    // char file_list[131072]; //char arr to contain all the "[filename]\n"
-    // strcpy(file_list, "");
-    // //append all the filenames to our list in a single string
-    // DIR * dir = opendir(tdir);
-    // if (!dir){
-    //     perror("Error opening directory\n");
-    //     return -1;
-    // }
-    // struct dirent * cfile;
-    // while ((cfile = readdir(dir)) != NULL){
-    //     strcat(file_list, cfile->d_name);
-    //     strcat(file_list, "\n");
-    // }
-    // ssize_t filels_size = strlen(file_list); //keep track of the size of cummulative sum of "[filename]\n" sizes 
-    // file_list[filels_size-1] = '\0'; // remove the last nextline character
-    // filels_size --;
-    // //send header: OK\n
-    // char *header = "OK\n";
-    // ssize_t header_written = write_all_to_socket(cfd, header, strlen(header));
-    // //send message length
-    // ssize_t msg_len_written = write_message_size(filels_size, cfd);
-    // // if (header_written == -1 || msg_len_written == -1){
-    // //     // fprintf(stderr, "LIST ERROR: Unable to write header or msg size\n");
-    // //     return -1;
-    // // }
-    // //send message body
-    // ssize_t sent_len = write_all_to_socket(cfd, file_list, filels_size);
-    // if (sent_len < filels_size){
-    //     // fprintf(stderr, "LIST ERROR: Did not write entire message to client\n");
-    //     return -1;
-    // }
-    // return 0;
 }
 int get_handler(char * filename, int cfd){
     //get the path of the file to get
     char path[strlen(filename) + strlen(tdir) + 2];
+    memset(path, 0, strlen(tdir) + strlen(filename) + 2);
     sprintf(path, "%s/%s", tdir, filename);
     //Open stat file for info:
     struct stat lfstat;
@@ -475,34 +439,32 @@ int get_handler(char * filename, int cfd){
         return -1;
     }
     size_t toReadSize = lfstat.st_size; //size of file
-    // WRITE PART 1: header information: ie OK\n[size]
-    char headerMsg[1024];
-    sprintf(headerMsg, "OK\n");// NOTE: sprintf write the nul character to the end
-    size_t headerLen = strlen(headerMsg);
-    ssize_t bRead_header = write_all_to_socket(cfd, headerMsg, headerLen); //write to socket
-    if (bRead_header == -1){
-        // printf("**GET ERROR: Unable to write header info to client\n"); fflush(stdout);
-        return -1;
-    }
-    write_message_size(toReadSize, cfd);
+    
     // open file to read
     FILE* lf = fopen(path, "r");
     if (!lf){ //file does not exist
         send_error_msg(cfd, err_no_such_file);
         return -1;
     }
+    // WRITE PART 1: header information: ie OK\n[size]
+    char headerMsg[8];
+    sprintf(headerMsg, "OK\n");// NOTE: sprintf write the nul character to the end
+    size_t headerLen = strlen(headerMsg);
+    write_all_to_socket(cfd, headerMsg, headerLen); //write to socket
+    write_message_size(toReadSize, cfd);
     size_t hasRead = 0; //keep track of total bytes read
     char buffer[BLOCK_SIZE]; //temp array to store information to be copied over: 1 block worth of info
     while (toReadSize > 0 && !feof(lf)){ // Run while loop till all local file data has been written 
         size_t cur_toRead = min(toReadSize, BLOCK_SIZE);
         ssize_t bRead_cur;
         if ((bRead_cur = fread(buffer, 1, cur_toRead, lf)) > 0){ // Still have data to read
-            ssize_t act_wrote = write_all_to_socket(cfd, buffer, bRead_cur);
-            if (act_wrote != bRead_cur){
-                // printf("**GET ERROR: Write to client failed!\n"); 
-                if (lf) fclose(lf);
-                return -1;
-            } 
+            // ssize_t act_wrote = write_all_to_socket(cfd, buffer, bRead_cur);
+            // if (act_wrote != bRead_cur){
+            //     // printf("**GET ERROR: Write to client failed!\n"); 
+            //     if (lf) fclose(lf);
+            //     return -1;
+            // } 
+            write_all_to_socket(cfd, buffer, bRead_cur);
             toReadSize -= bRead_cur;
             hasRead += bRead_cur;
         }
@@ -514,6 +476,7 @@ int get_handler(char * filename, int cfd){
 int put_handler(char * filename, int cfd){
     //get the path of the file to get
     char path[strlen(filename) + strlen(tdir) + 2];
+    memset(path, 0, strlen(tdir) + strlen(filename) + 2);
     sprintf(path, "%s/%s", tdir, filename);
     //get file size from start of message (immediately after header)
     ssize_t toReadSize = get_message_size(cfd); //Number of bytes to read from the socket
@@ -537,8 +500,8 @@ int put_handler(char * filename, int cfd){
             size_t cur_toRead = min(toReadSize, BLOCK_SIZE);
             ssize_t bRead_cur; 
             if ((bRead_cur = read_all_from_socket(cfd, buffer, cur_toRead)) > 0){ // Read success
-                ssize_t act_wrote = fwrite(buffer, 1, bRead_cur, lf);
-                if (bRead_cur != act_wrote) printf("**PUT ERROR: Write to server local file failed\n");
+                fwrite(buffer, 1, bRead_cur, lf);
+                // if (bRead_cur != act_wrote) printf("**PUT ERROR: Write to server local file failed\n");
                 toReadSize -= bRead_cur;
                 hasWritten += bRead_cur;
             }
