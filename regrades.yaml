@@ -14,7 +14,7 @@ assignments:
   ideal_indirection: false
   luscious_locks: false
   mad_mad_access_patterns: false
-  malloc: false
+  malloc: true
   mapreduce: false
   mini_memcheck: false
   parallel_make:
