@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Memory failed to allocate!\n");
         return 1;
     }
-
+    fprintf(stderr, "HERE 1\n");
     for (i = 0; i < TOTAL_ALLOCS; i++) {
         arr[i] = malloc(sizeof(int));
         if (arr[i] == NULL) {
@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
 
         *(arr[i]) = i;
     }
-
+    fprintf(stderr, "HERE 2\n");
     for (i = 0; i < TOTAL_ALLOCS; i++) {
         if (*(arr[i]) != i) {
             fprintf(stderr, "Memory failed to contain correct data after many "
@@ -33,11 +33,12 @@ int main(int argc, char *argv[]) {
             return 2;
         }
     }
-
+    fprintf(stderr, "HERE 3\n");
     for (i = 0; i < TOTAL_ALLOCS; i++)
         free(arr[i]);
 
     free(arr);
     fprintf(stderr, "Memory was allocated, used, and freed!\n");
+    fprintf(stderr, "HERE 4\n");
     return 0;
 }

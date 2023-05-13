@@ -27,20 +27,24 @@ int main(int argc, char *argv[]) {
         void *ptr;
 
         if (realloc_ptr == NULL) {
+            // fprintf(stderr, "[");
             ptr = malloc(size);
+            // fprintf(stderr, "*");
             malloc(1);
             data_written = 0;
+            // fprintf(stderr, "]");
         } else {
+            // fprintf(stderr, "(");
             ptr = realloc(realloc_ptr, size);
             malloc(1);
             realloc_ptr = NULL;
+            // fprintf(stderr, ")");
         }
 
         if (ptr == NULL) {
             fprintf(stderr, "Memory failed to allocate!\n");
             return 1;
         }
-
         if (rand() % 100 < CHANCE_OF_FREE)
             free(ptr);
         else {
@@ -60,7 +64,6 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-
     for (i = dictionary_ct - 1; i >= 0; i--) {
         if (*((void **)dictionary[i]) != &dictionary[i]) {
             fprintf(
@@ -100,7 +103,6 @@ int main(int argc, char *argv[]) {
         */
         free(dictionary[i]);
     }
-
     fprintf(stderr, "Memory was allocated and freed!\n");
     return 0;
 }
